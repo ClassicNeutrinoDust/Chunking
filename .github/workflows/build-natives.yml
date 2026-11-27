@@ -3,11 +3,11 @@ name: Build Native SIMD Libraries
 on:
   push:
     paths:
-      - 'src/main/native/**'
-      - '.github/workflows/build-natives.yml'
+      - '**/src/main/native/**'
+      - '**/.github/workflows/build-natives.yml'
   pull_request:
     paths:
-      - 'src/main/native/**'
+      - '**/src/main/native/**'
   workflow_dispatch:
 
 jobs:
@@ -43,6 +43,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Locate project root
+        id: root
+        shell: bash
+        run: |
+          if [ -f "${{ matrix.source }}" ]; then
+            echo "Resolved project root: ."
+            echo "dir=." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          FOUND="$(find . -path "*/${{ matrix.source }}" -print -quit)"
+          if [ -n "$FOUND" ]; then
+            ROOT_DIR="${FOUND%/${{ matrix.source }}}"
+            ROOT_DIR="${ROOT_DIR#./}"
+            echo "Resolved project root: $ROOT_DIR"
+            echo "dir=$ROOT_DIR" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "::error::Missing ${{ matrix.source }} in repository. Ensure src/main/native/ is committed and pushed."
+          exit 1
+
       - name: Setup MSVC (windows-x64)
         if: matrix.toolchain == 'msvc'
         uses: ilammy/msvc-dev-cmd@v1
@@ -51,6 +71,7 @@ jobs:
 
       - name: Build windows-x64 (MSVC AVX2)
         if: matrix.toolchain == 'msvc'
+        working-directory: ${{ steps.root.outputs.dir }}
         shell: cmd
         run: |
           if not exist src\main\resources\natives\windows-x64 mkdir src\main\resources\natives\windows-x64
@@ -58,6 +79,7 @@ jobs:
 
       - name: Build linux-x64 (GCC AVX2)
         if: matrix.toolchain == 'gcc-x64'
+        working-directory: ${{ steps.root.outputs.dir }}
         run: |
           mkdir -p "$(dirname "${{ matrix.output }}")"
           g++ -O3 -std=c++17 -mavx2 -ffp-contract=off -fno-exceptions -fno-rtti -shared -fPIC \
@@ -66,6 +88,7 @@ jobs:
 
       - name: Build linux-aarch64 (GCC ARM64)
         if: matrix.toolchain == 'gcc-arm64'
+        working-directory: ${{ steps.root.outputs.dir }}
         run: |
           mkdir -p "$(dirname "${{ matrix.output }}")"
           g++ -O3 -std=c++17 -ffp-contract=off -fno-exceptions -fno-rtti -shared -fPIC \
@@ -74,6 +97,7 @@ jobs:
 
       - name: Build macos-aarch64 (Clang ARM64)
         if: matrix.toolchain == 'clang-arm64'
+        working-directory: ${{ steps.root.outputs.dir }}
         run: |
           mkdir -p "$(dirname "${{ matrix.output }}")"
           clang++ -O3 -std=c++17 -arch arm64 -ffp-contract=off -fno-exceptions -fno-rtti -shared -fPIC \
@@ -84,5 +108,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: native-${{ matrix.name }}
-          path: ${{ matrix.output }}
+          path: ${{ steps.root.outputs.dir }}/${{ matrix.output }}
           if-no-files-found: error

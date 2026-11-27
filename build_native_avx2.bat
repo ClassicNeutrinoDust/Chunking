@@ -3,6 +3,7 @@ setlocal enabledelayedexpansion
 
 set "ROOT_DIR=%~dp0"
 if "%ROOT_DIR:~-1%"=="\" set "ROOT_DIR=%ROOT_DIR:~0,-1%"
+if not exist "%ROOT_DIR%\src\main\native\chunking_avx2.cpp" if exist "%ROOT_DIR%\Fabric\MC-26.2\src\main\native\chunking_avx2.cpp" set "ROOT_DIR=%ROOT_DIR%\Fabric\MC-26.2"
 
 set "SRC=%ROOT_DIR%\src\main\native\chunking_avx2.cpp"
 set "OUT_DIR=%ROOT_DIR%\src\main\resources\natives\windows-x64"

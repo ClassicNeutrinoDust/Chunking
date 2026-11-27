@@ -2,6 +2,9 @@
 set -eu
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+if [ ! -d "$ROOT_DIR/src/main/native" ] && [ -d "$ROOT_DIR/Fabric/MC-26.2/src/main/native" ]; then
+    ROOT_DIR="$ROOT_DIR/Fabric/MC-26.2"
+fi
 ARCH="$(uname -m)"
 
 CXX="${CXX:-}"
