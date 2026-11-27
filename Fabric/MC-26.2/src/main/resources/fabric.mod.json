@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "chunking",
+  "version": "${version}",
+  "name": "Chunking Engine",
+  "description": "Fast multithreaded chunk generation, saving, and smooth chunk streaming for Minecraft 26.2.",
+  "icon": "assets/chunking/icon.png",
+  "authors": [
+    "neutrinodust"
+  ],
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.chunking.engine.ChunkingMod"
+    ],
+    "client": [
+      "com.chunking.engine.client.ChunkingClientMod"
+    ],
+    "modmenu": [
+      "com.chunking.engine.client.compat.ModMenuEntry"
+    ]
+  },
+  "mixins": [
+    "chunking.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~26.2",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}

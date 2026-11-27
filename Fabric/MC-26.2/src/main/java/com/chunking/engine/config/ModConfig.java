@@ -1,0 +1,190 @@
+package com.chunking.engine.config;
+
+import com.chunking.engine.ChunkingMod;
+import com.chunking.engine.core.ChunkEngine;
+import com.chunking.engine.mixin.MixinPlugin;
+import com.chunking.engine.scheduler.FrameGuard;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.loader.api.FabricLoader;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Properties;
+
+/**
+ * Runtime settings for Chunking. System properties (-Dchunking.*) override config/chunking.properties.
+ */
+public final class ModConfig {
+    private static final Path CONFIG_PATH = resolveConfigPath();
+    private static volatile Properties FILE = loadFile();
+
+    public static volatile int FULL_CHUNK_RADIUS;
+    public static volatile boolean PARALLEL_STATUS_TASKS;
+    public static volatile boolean SIMD_NOISE;
+    public static volatile boolean FAST_SURFACE_RULES;
+    public static volatile boolean VELOCITY_CONE_SCHEDULER;
+    public static volatile boolean ADAPTIVE_GOVERNOR;
+    public static volatile boolean LIVE_BENCHMARK_HUD;
+    public static volatile boolean SCALE_DIMENSION_FOG;
+    public static volatile boolean REDUCE_SCREEN_BLUR;
+    public static volatile int WORLDGEN_WORKERS;
+    public static final int MAX_CONCURRENT_DISPATCHES;
+
+    static {
+        applyProperties();
+        MAX_CONCURRENT_DISPATCHES = integer(
+                "chunking.max_concurrent_dispatches",
+                "max_concurrent_dispatches",
+                Math.max(4, Math.min(2048, WORLDGEN_WORKERS * 4)),
+                2,
+                2048
+        );
+        if (!Files.isRegularFile(CONFIG_PATH)) {
+            save();
+        }
+    }
+
+    private ModConfig() {}
+
+    private static void applyProperties() {
+        FULL_CHUNK_RADIUS = integer("chunking.full_chunk_radius", "full_chunk_radius", 64, 8, 64);
+        PARALLEL_STATUS_TASKS = bool("chunking.parallel_status_tasks", "parallel_status_tasks", true);
+        SIMD_NOISE = bool("chunking.simd_noise", "simd_noise", true);
+        FAST_SURFACE_RULES = bool("chunking.fast_surface_rules", "fast_surface_rules", true);
+        VELOCITY_CONE_SCHEDULER = bool("chunking.velocity_cone_scheduler", "velocity_cone_scheduler", true);
+        ADAPTIVE_GOVERNOR = bool("chunking.adaptive_governor", "adaptive_governor", true);
+        LIVE_BENCHMARK_HUD = bool("chunking.live_benchmark_hud", "live_benchmark_hud", false);
+        SCALE_DIMENSION_FOG = bool("chunking.scale_dimension_fog", "scale_dimension_fog", true);
+        REDUCE_SCREEN_BLUR = bool("chunking.reduce_screen_blur", "reduce_screen_blur", true);
+        WORLDGEN_WORKERS = integer("chunking.worldgen_workers", "worldgen_workers", defaultWorldgenWorkers(), 1, 256);
+    }
+
+    private static Path resolveConfigPath() {
+        try {
+            return FabricLoader.getInstance().getConfigDir().resolve("chunking.properties");
+        } catch (Throwable ignored) {
+            return Path.of("config", "chunking.properties");
+        }
+    }
+
+    public static boolean isClientEnvironment() {
+        try {
+            return FabricLoader.getInstance().getEnvironmentType() == EnvType.CLIENT;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    public static int defaultWorldgenWorkers() {
+        int cpus = Runtime.getRuntime().availableProcessors();
+        int byCpu;
+        if (cpus <= 2) {
+            byCpu = 1;
+        } else if (cpus <= 8) {
+            byCpu = cpus - Math.max(1, cpus / 4);
+        } else {
+            int reserved = cpus <= 24 ? 4 : Math.max(4, Math.min(12, cpus / 10));
+            byCpu = Math.min(256, Math.max(8, cpus - reserved));
+        }
+        // Keep a ~1 GB reserve on small heaps so low-RAM clients do not OOM.
+        long maxHeapMb = Runtime.getRuntime().maxMemory() / (1024L * 1024L);
+        int byHeap = maxHeapMb <= 2560L
+                ? (int) Math.max(1L, Math.min(3L, Math.max(0L, maxHeapMb - 1024L) / 350L))
+                : (int) Math.max(1L, Math.min(256L, maxHeapMb / 220L));
+        int result = Math.max(1, Math.min(byCpu, byHeap));
+        if (isClientEnvironment()) {
+            int byClientCpu = maxHeapMb <= 4608L
+                    ? Math.max(2, Math.min(6, cpus / 3))
+                    : Math.max(2, Math.min(8, Math.max(2, cpus / 2 - 2)));
+            int clientWorkers = Math.min(result, byClientCpu);
+            return MixinPlugin.isLodModLoaded() ? Math.max(1, clientWorkers - 2) : clientWorkers;
+        }
+        return result;
+    }
+
+    public static int effectiveMaxConcurrentDispatches() {
+        int w = Math.max(1, WORLDGEN_WORKERS);
+        return Math.max(4, Math.min(2048, w * 4));
+    }
+
+    public static int effectiveFullChunkRadius(int requestedRenderDistance) {
+        return Math.max(2, Math.min(FULL_CHUNK_RADIUS, requestedRenderDistance));
+    }
+
+    public static int maxSliderRenderDistance() {
+        return Math.max(32, FULL_CHUNK_RADIUS);
+    }
+
+    public static int maxPlayerTicketDistance() {
+        return Math.max(64, Math.min(124, FULL_CHUNK_RADIUS));
+    }
+
+    public static synchronized void reload() {
+        FILE = loadFile();
+        applyProperties();
+        ChunkEngine.get().workerPool().setParallelism(WORLDGEN_WORKERS);
+        if (ADAPTIVE_GOVERNOR) {
+            FrameGuard.get().start(ChunkEngine.get().workerPool().parallelism(), ChunkingMod.LOGGER::info);
+        } else {
+            FrameGuard.get().stop();
+        }
+    }
+
+    public static synchronized void save() {
+        Properties props = new Properties();
+        props.setProperty("full_chunk_radius", Integer.toString(FULL_CHUNK_RADIUS));
+        props.setProperty("parallel_status_tasks", Boolean.toString(PARALLEL_STATUS_TASKS));
+        props.setProperty("simd_noise", Boolean.toString(SIMD_NOISE));
+        props.setProperty("fast_surface_rules", Boolean.toString(FAST_SURFACE_RULES));
+        props.setProperty("velocity_cone_scheduler", Boolean.toString(VELOCITY_CONE_SCHEDULER));
+        props.setProperty("adaptive_governor", Boolean.toString(ADAPTIVE_GOVERNOR));
+        props.setProperty("live_benchmark_hud", Boolean.toString(LIVE_BENCHMARK_HUD));
+        props.setProperty("scale_dimension_fog", Boolean.toString(SCALE_DIMENSION_FOG));
+        props.setProperty("reduce_screen_blur", Boolean.toString(REDUCE_SCREEN_BLUR));
+        props.setProperty("worldgen_workers", Integer.toString(WORLDGEN_WORKERS));
+        props.setProperty("max_concurrent_dispatches", Integer.toString(effectiveMaxConcurrentDispatches()));
+
+        try {
+            Path parent = CONFIG_PATH.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            try (OutputStream out = Files.newOutputStream(CONFIG_PATH)) {
+                props.store(out, "Chunking Engine Configuration");
+            }
+        } catch (IOException e) {
+            System.err.println("[Chunking] Could not write " + CONFIG_PATH.toAbsolutePath() + ": " + e);
+        }
+    }
+
+    private static Properties loadFile() {
+        Properties props = new Properties();
+        if (!Files.isRegularFile(CONFIG_PATH)) return props;
+        try (InputStream in = Files.newInputStream(CONFIG_PATH)) {
+            props.load(in);
+        } catch (IOException ignored) {
+        }
+        return props;
+    }
+
+    private static boolean bool(String sysKey, String fileKey, boolean fallback) {
+        String val = System.getProperty(sysKey);
+        if (val == null) val = FILE.getProperty(fileKey);
+        return val == null ? fallback : Boolean.parseBoolean(val);
+    }
+
+    private static int integer(String sysKey, String fileKey, int fallback, int min, int max) {
+        String val = System.getProperty(sysKey);
+        if (val == null) val = FILE.getProperty(fileKey);
+        if (val == null) return fallback;
+        try {
+            int parsed = Integer.parseInt(val);
+            return Math.max(min, Math.min(max, parsed));
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
+    }
+}

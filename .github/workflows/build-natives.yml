@@ -1,0 +1,88 @@
+name: Build Native SIMD Libraries
+
+on:
+  push:
+    paths:
+      - 'src/main/native/**'
+      - '.github/workflows/build-natives.yml'
+  pull_request:
+    paths:
+      - 'src/main/native/**'
+  workflow_dispatch:
+
+jobs:
+  build-natives:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x64
+            os: windows-latest
+            source: src/main/native/chunking_avx2.cpp
+            output: src/main/resources/natives/windows-x64/chunking_avx2.dll
+            toolchain: msvc
+          - name: linux-x64
+            os: ubuntu-latest
+            source: src/main/native/chunking_avx2.cpp
+            output: src/main/resources/natives/linux-x64/libchunking_avx2.so
+            toolchain: gcc-x64
+          - name: linux-aarch64
+            os: ubuntu-24.04-arm
+            source: src/main/native/chunking_neon.cpp
+            output: src/main/resources/natives/linux-aarch64/libchunking_neon.so
+            toolchain: gcc-arm64
+          - name: macos-aarch64
+            os: macos-latest
+            source: src/main/native/chunking_neon.cpp
+            output: src/main/resources/natives/macos-aarch64/libchunking_neon.dylib
+            toolchain: clang-arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC (windows-x64)
+        if: matrix.toolchain == 'msvc'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Build windows-x64 (MSVC AVX2)
+        if: matrix.toolchain == 'msvc'
+        shell: cmd
+        run: |
+          if not exist src\main\resources\natives\windows-x64 mkdir src\main\resources\natives\windows-x64
+          cl /nologo /O2 /arch:AVX2 /fp:precise /LD /std:c++17 ${{ matrix.source }} /Fe:${{ matrix.output }}
+
+      - name: Build linux-x64 (GCC AVX2)
+        if: matrix.toolchain == 'gcc-x64'
+        run: |
+          mkdir -p "$(dirname "${{ matrix.output }}")"
+          g++ -O3 -std=c++17 -mavx2 -ffp-contract=off -fno-exceptions -fno-rtti -shared -fPIC \
+            "${{ matrix.source }}" -o "${{ matrix.output }}"
+          strip --strip-unneeded "${{ matrix.output }}"
+
+      - name: Build linux-aarch64 (GCC ARM64)
+        if: matrix.toolchain == 'gcc-arm64'
+        run: |
+          mkdir -p "$(dirname "${{ matrix.output }}")"
+          g++ -O3 -std=c++17 -ffp-contract=off -fno-exceptions -fno-rtti -shared -fPIC \
+            "${{ matrix.source }}" -o "${{ matrix.output }}"
+          strip --strip-unneeded "${{ matrix.output }}"
+
+      - name: Build macos-aarch64 (Clang ARM64)
+        if: matrix.toolchain == 'clang-arm64'
+        run: |
+          mkdir -p "$(dirname "${{ matrix.output }}")"
+          clang++ -O3 -std=c++17 -arch arm64 -ffp-contract=off -fno-exceptions -fno-rtti -shared -fPIC \
+            "${{ matrix.source }}" -o "${{ matrix.output }}"
+          strip -x "${{ matrix.output }}"
+
+      - name: Upload native artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.name }}
+          path: ${{ matrix.output }}
+          if-no-files-found: error

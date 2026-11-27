@@ -1,0 +1,6 @@
+{
+  "key.category.chunking.general": "Chunking",
+  "key.chunking.toggle_hud": "Toggle Live Debug HUD",
+  "key.chunking.open_settings": "Open Chunking Settings",
+  "key.chunking.reset_hud": "Reset Debug HUD Stats"
+}
