@@ -18,7 +18,7 @@ import net.minecraft.network.chat.Component;
  * cleanly to a built-in vanilla screen when Cloth Config is absent.
  */
 public final class SettingsScreen extends Screen {
-    private static final int[] RENDER_DISTANCE_STEPS = {32, 40, 48, 56, 64};
+    private static final int[] RENDER_DISTANCE_STEPS = {0, 32, 40, 48, 56, 64};
 
     private final Screen parent;
     private final int initialWorkers;
@@ -33,7 +33,8 @@ public final class SettingsScreen extends Screen {
     private SettingsScreen(Screen parent) {
         super(Component.literal("Chunking Settings"));
         this.parent = parent;
-        this.renderDistance = Math.max(32, Math.min(64, ModConfig.FULL_CHUNK_RADIUS));
+        int rawRd = ModConfig.CONFIGURED_FULL_CHUNK_RADIUS;
+        this.renderDistance = rawRd <= 0 ? 0 : Math.max(32, Math.min(64, rawRd));
         this.configuredWorkers = Math.max(0, Math.min(maxWorkerChoices(), ModConfig.CONFIGURED_WORLDGEN_WORKERS));
         this.initialWorkers = this.configuredWorkers;
         this.initialRenderDistance = this.renderDistance;
@@ -80,6 +81,13 @@ public final class SettingsScreen extends Screen {
         return 0;
     }
 
+    private static Component renderDistanceLabel(int configured) {
+        if (configured <= 0) {
+            return Component.literal("Max Render: Auto (" + ModConfig.defaultFullChunkRadius() + ")");
+        }
+        return Component.literal("Max Render Distance: " + configured);
+    }
+
     private static Component workersLabel(int configured) {
         if (configured == 0) {
             return Component.literal("Threads: Auto (" + ModConfig.defaultWorldgenWorkers() + ")");
@@ -120,9 +128,9 @@ public final class SettingsScreen extends Screen {
             btn.setMessage(toggleLabel("Fast Chunk Saving", this.fastSaving));
         }).bounds(leftX, topY + rowH, colW, 20).build());
 
-        addRenderableWidget(Button.builder(Component.literal("Max Render Distance: " + this.renderDistance), btn -> {
+        addRenderableWidget(Button.builder(renderDistanceLabel(this.renderDistance), btn -> {
             this.renderDistance = nextRenderDistance(this.renderDistance);
-            btn.setMessage(Component.literal("Max Render Distance: " + this.renderDistance));
+            btn.setMessage(renderDistanceLabel(this.renderDistance));
         }).bounds(rightX, topY + rowH, colW, 20).build());
 
         addRenderableWidget(Button.builder(toggleLabel("Better Nether/End Fog", this.scaleFog), btn -> {
@@ -139,7 +147,7 @@ public final class SettingsScreen extends Screen {
             this.configuredWorkers = 0;
             this.smoothMode = true;
             this.fastSaving = true;
-            this.renderDistance = 64;
+            this.renderDistance = 0;
             this.scaleFog = true;
             this.liveHudOnLaunch = false;
             rebuildWidgets();
@@ -153,7 +161,7 @@ public final class SettingsScreen extends Screen {
     }
 
     private void saveAndApply() {
-        ModConfig.FULL_CHUNK_RADIUS = this.renderDistance;
+        ModConfig.setConfiguredFullChunkRadius(this.renderDistance);
         ModConfig.ADAPTIVE_GOVERNOR = this.smoothMode;
         ModConfig.FAST_ASYNC_SAVING = this.fastSaving;
         ModConfig.SCALE_DIMENSION_FOG = this.scaleFog;

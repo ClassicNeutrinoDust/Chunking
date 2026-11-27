@@ -22,6 +22,7 @@ public final class ModConfig {
     private static final Path CONFIG_PATH = resolveConfigPath();
     private static volatile Properties FILE = loadFile();
 
+    public static volatile int CONFIGURED_FULL_CHUNK_RADIUS;
     public static volatile int FULL_CHUNK_RADIUS;
     public static volatile boolean PARALLEL_STATUS_TASKS;
     public static volatile boolean SIMD_NOISE;
@@ -53,7 +54,8 @@ public final class ModConfig {
     private ModConfig() {}
 
     private static void applyProperties() {
-        FULL_CHUNK_RADIUS = integer("chunking.full_chunk_radius", "full_chunk_radius", 64, 32, 64);
+        int rawRadius = integer("chunking.full_chunk_radius", "full_chunk_radius", 0, 0, 64);
+        setConfiguredFullChunkRadius(rawRadius);
         PARALLEL_STATUS_TASKS = bool("chunking.parallel_status_tasks", "parallel_status_tasks", true);
         SIMD_NOISE = bool("chunking.simd_noise", "simd_noise", true);
         FAST_SURFACE_RULES = bool("chunking.fast_surface_rules", "fast_surface_rules", true);
@@ -67,6 +69,41 @@ public final class ModConfig {
         int rawWorkers = integer("chunking.worldgen_workers", "worldgen_workers", 0, 0, 256);
         CONFIGURED_WORLDGEN_WORKERS = rawWorkers;
         WORLDGEN_WORKERS = rawWorkers == 0 ? defaultWorldgenWorkers() : rawWorkers;
+    }
+
+    public static void setConfiguredFullChunkRadius(int configured) {
+        if (configured <= 0) {
+            CONFIGURED_FULL_CHUNK_RADIUS = 0;
+            FULL_CHUNK_RADIUS = defaultFullChunkRadius();
+        } else {
+            int clamped = Math.max(32, Math.min(64, configured));
+            CONFIGURED_FULL_CHUNK_RADIUS = clamped;
+            FULL_CHUNK_RADIUS = clamped;
+        }
+    }
+
+    public static int defaultFullChunkRadius() {
+        if (!isClientEnvironment()) {
+            return 64;
+        }
+        long maxHeapMb = Runtime.getRuntime().maxMemory() / (1024L * 1024L);
+        return recommendedClientRenderDistance(maxHeapMb);
+    }
+
+    public static int recommendedClientRenderDistance(long maxHeapMb) {
+        if (maxHeapMb <= 4608L) {
+            return 32;
+        }
+        if (maxHeapMb <= 7168L) {
+            return 40;
+        }
+        if (maxHeapMb <= 10240L) {
+            return 48;
+        }
+        if (maxHeapMb <= 13312L) {
+            return 56;
+        }
+        return 64;
     }
 
     public static void setConfiguredWorkers(int configured) {
@@ -163,9 +200,10 @@ public final class ModConfig {
                 + "# saving. Turn off only if you want strict per-write disk flushes.\n"
                 + "fast_async_saving=" + FAST_ASYNC_SAVING + "\n\n"
                 + "# --- Visuals & HUD ---\n\n"
-                + "# Maximum Render Distance allowed on the Video Settings slider (32 to 64 chunks).\n"
+                + "# Maximum Render Distance allowed on the Video Settings slider (0 = Auto by RAM, 32-64 = manual).\n"
+                + "# Recommended RAM for singleplayer: 32 ch ~= 4 GB, 48 ch ~= 8 GB, 64 ch ~= 14-16 GB.\n"
                 + "# Note: If Sodium is installed, restart the game after changing this.\n"
-                + "full_chunk_radius=" + FULL_CHUNK_RADIUS + "\n\n"
+                + "full_chunk_radius=" + CONFIGURED_FULL_CHUNK_RADIUS + "\n\n"
                 + "# Better Nether & End Fog: extends Nether and End fog to match your Render Distance.\n"
                 + "# Automatically yields if Voxy or Distant Horizons is installed.\n"
                 + "scale_dimension_fog=" + SCALE_DIMENSION_FOG + "\n\n"

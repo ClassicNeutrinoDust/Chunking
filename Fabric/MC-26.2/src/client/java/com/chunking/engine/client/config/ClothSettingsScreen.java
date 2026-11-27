@@ -69,11 +69,16 @@ final class ClothSettingsScreen {
 
         ConfigCategory visuals = builder.getOrCreateCategory(Component.literal("Visuals & HUD"));
 
-        int clampedRenderDistance = Math.max(32, Math.min(64, ModConfig.FULL_CHUNK_RADIUS));
-        var rdEntry = entries.startIntSlider(Component.literal("Max Render Distance"), clampedRenderDistance, 32, 64)
-                .setDefaultValue(64)
-                .setTooltip(Component.literal("Maximum Render Distance allowed on the Video Settings slider (32 to 64 chunks)."))
-                .setSaveConsumer(val -> ModConfig.FULL_CHUNK_RADIUS = val);
+        int sliderVal = ModConfig.CONFIGURED_FULL_CHUNK_RADIUS == 0
+                ? 31
+                : Math.max(32, Math.min(64, ModConfig.CONFIGURED_FULL_CHUNK_RADIUS));
+        var rdEntry = entries.startIntSlider(Component.literal("Max Render Distance"), sliderVal, 31, 64)
+                .setDefaultValue(31)
+                .setTextGetter(val -> val <= 31
+                        ? Component.literal("Auto (" + ModConfig.defaultFullChunkRadius() + " ch)")
+                        : Component.literal(val + " chunks"))
+                .setTooltip(Component.literal("Maximum Render Distance on the Video Settings slider. Auto picks a safe cap for your JVM RAM (4 GB = 32, 8 GB = 48, 16 GB = 64). Higher manual values require more RAM (-Xmx)."))
+                .setSaveConsumer(val -> ModConfig.setConfiguredFullChunkRadius(val <= 31 ? 0 : val));
         if (MixinPlugin.isSodiumLoaded()) {
             rdEntry.requireRestart();
         }

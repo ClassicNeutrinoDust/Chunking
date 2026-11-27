@@ -51,11 +51,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.Queue;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
@@ -563,11 +565,16 @@ public abstract class ChunkMapDistanceMixin {
         long budgetNs;
         FrameGuard gov = FrameGuard.get();
         if (gov.hasActiveClientFrames()) {
-            if (gov.isServerTickPressured()) {
-                budgetNs = pending > 192 ? 1_000_000L : 500_000L;
+            if (pending > 2048) {
+                budgetNs = 8_000_000L;
+            } else if (pending > 512) {
+                budgetNs = gov.isServerTickPressured() ? 3_000_000L : 4_000_000L;
+            } else if (pending > 192) {
+                budgetNs = gov.isServerTickPressured() ? 1_250_000L : 1_750_000L;
+            } else if (gov.isServerTickPressured()) {
+                budgetNs = 500_000L;
             } else {
-                budgetNs = pending > 192 ? 1_500_000L
-                        : (pending > 64 ? 1_000_000L : 750_000L);
+                budgetNs = pending > 64 ? 1_000_000L : 750_000L;
             }
         } else if (!this.level.players().isEmpty()) {
             double lastMs = TickBudget.lastRecordedTickMs();
@@ -659,17 +666,26 @@ public abstract class ChunkMapDistanceMixin {
                     int cpus = Runtime.getRuntime().availableProcessors();
                     int workers = Math.max(1, ModConfig.WORLDGEN_WORKERS);
                     int threads = isClient
-                            ? 2
+                            ? Math.max(2, Math.min(4, cpus / 4))
                             : Math.max(4, Math.min(16, Math.max(workers / 2, cpus / 3)));
+                    int queueCap = isClient ? 64 : 256;
                     int prio = isClient
                             ? Math.max(Thread.MIN_PRIORITY, Thread.NORM_PRIORITY - 2)
                             : Math.max(Thread.MIN_PRIORITY, Thread.NORM_PRIORITY - 1);
-                    exec = Executors.newFixedThreadPool(threads, r -> {
-                        Thread t = new Thread(r, "Chunking-SaveSer-" + CHUNKING$SAVE_SERIALIZER_IDS.getAndIncrement());
-                        t.setDaemon(true);
-                        t.setPriority(prio);
-                        return t;
-                    });
+                    exec = new ThreadPoolExecutor(
+                            threads,
+                            threads,
+                            0L,
+                            TimeUnit.MILLISECONDS,
+                            new ArrayBlockingQueue<>(queueCap),
+                            r -> {
+                                Thread t = new Thread(r, "Chunking-SaveSer-" + CHUNKING$SAVE_SERIALIZER_IDS.getAndIncrement());
+                                t.setDaemon(true);
+                                t.setPriority(prio);
+                                return t;
+                            },
+                            new ThreadPoolExecutor.CallerRunsPolicy()
+                    );
                     this.chunking$saveSerializerExecutor = exec;
                 }
             }
@@ -855,6 +871,12 @@ public abstract class ChunkMapDistanceMixin {
             int sz = this.pendingUnloads.size();
             FrameGuard gov = FrameGuard.get();
             if (gov.hasActiveClientFrames()) {
+                if (sz > 2048) {
+                    return 2000 + Math.min(64, ((sz - 2048) >> 5) + 16);
+                }
+                if (sz > 512) {
+                    return 2000 + Math.min(16, ((sz - 512) >> 5) + 4);
+                }
                 return sz > 192 ? 2000 + Math.min(4, ((sz - 192) >> 4) + 1) : 0;
             }
             if (!this.level.players().isEmpty()) {

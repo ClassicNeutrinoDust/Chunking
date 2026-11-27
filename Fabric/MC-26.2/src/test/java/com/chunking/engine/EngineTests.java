@@ -1839,6 +1839,17 @@ public final class EngineTests {
         int maxSlider = com.chunking.engine.config.ModConfig.maxSliderRenderDistance();
         assertTrue(maxSlider >= 64, "maxSliderRenderDistance must be >= 64, got " + maxSlider);
 
+        assertTrue(com.chunking.engine.config.ModConfig.recommendedClientRenderDistance(4096L) == 32,
+                "4 GB heap must recommend 32 chunk cap");
+        assertTrue(com.chunking.engine.config.ModConfig.recommendedClientRenderDistance(6144L) == 40,
+                "6 GB heap must recommend 40 chunk cap");
+        assertTrue(com.chunking.engine.config.ModConfig.recommendedClientRenderDistance(8192L) == 48,
+                "8 GB heap must recommend 48 chunk cap");
+        assertTrue(com.chunking.engine.config.ModConfig.recommendedClientRenderDistance(12288L) == 56,
+                "12 GB heap must recommend 56 chunk cap");
+        assertTrue(com.chunking.engine.config.ModConfig.recommendedClientRenderDistance(16384L) == 64,
+                "16 GB heap must recommend 64 chunk cap");
+
         int[] dists = {0, 16, 24, 32, 48, 64};
         int prevBucket = -1;
         for (int d : dists) {
