@@ -51,15 +51,25 @@ public abstract class SurfaceLazyConditionMixin
      */
     @Overwrite
     public boolean test() {
+        if (!com.chunking.engine.config.ModConfig.FAST_SURFACE_RULES) {
+            long cur = this.getContextLastUpdate();
+            if (cur == this.lastUpdate) {
+                return this.chunking$cachedResult;
+            }
+            this.lastUpdate = cur;
+            boolean val = this.compute();
+            this.chunking$cachedResult = val;
+            return val;
+        }
         int kind = this.chunking$kind;
         if (kind == 1) {
             long cur = this.chunking$ctxAcc.chunking$getLastUpdateXZ();
             if (cur == this.lastUpdate) {
                 return this.chunking$cachedResult;
             }
+            this.lastUpdate = cur;
             boolean val = this.compute();
             this.chunking$cachedResult = val;
-            this.lastUpdate = cur;
             return val;
         }
         if (kind == 2) {
@@ -67,18 +77,18 @@ public abstract class SurfaceLazyConditionMixin
             if (cur == this.lastUpdate) {
                 return this.chunking$cachedResult;
             }
+            this.lastUpdate = cur;
             boolean val = this.compute();
             this.chunking$cachedResult = val;
-            this.lastUpdate = cur;
             return val;
         }
         long cur = this.getContextLastUpdate();
         if (cur == this.lastUpdate) {
             return this.chunking$cachedResult;
         }
+        this.lastUpdate = cur;
         boolean val = this.compute();
         this.chunking$cachedResult = val;
-        this.lastUpdate = cur;
         return val;
     }
 

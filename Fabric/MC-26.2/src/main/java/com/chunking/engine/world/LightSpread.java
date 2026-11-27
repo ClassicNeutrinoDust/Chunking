@@ -29,8 +29,20 @@ public final class LightSpread {
     }
 
     private static final Direction[] DIRECTIONS = Direction.values();
+    public static final boolean ALL_AIR_IS_PLAIN = detectAllAirIsPlain();
 
     private LightSpread() {}
+
+    private static boolean detectAllAirIsPlain() {
+        for (net.minecraft.world.level.block.Block block : net.minecraft.core.registries.BuiltInRegistries.BLOCK) {
+            for (BlockState state : block.getStateDefinition().getPossibleStates()) {
+                if (state.isAir() && (state.getLightEmission() > 0 || state.getLightDampening() > 0)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
 
     public static boolean isEmptyShapeFast(BlockState state) {
         return !state.canOcclude() || !state.useShapeForLightOcclusion();
@@ -73,7 +85,7 @@ public final class LightSpread {
                 LevelChunkSection[] secs = ca.getSections();
                 if (secIdx >= 0 && secIdx < secs.length && secs[secIdx] != null) {
                     LevelChunkSection sec = secs[secIdx];
-                    boolean onlyAir = sec.hasOnlyAir();
+                    boolean onlyAir = ALL_AIR_IS_PLAIN && sec.hasOnlyAir();
                     boolean copied = false;
                     BlockState fromState = null;
 
@@ -274,7 +286,7 @@ public final class LightSpread {
                                 LevelChunkSection[] secs = ca.getSections();
                                 if (secIdx >= 0 && secIdx < secs.length && secs[secIdx] != null) {
                                     blockSec = secs[secIdx];
-                                    blockSecOnlyAir = blockSec.hasOnlyAir();
+                                    blockSecOnlyAir = ALL_AIR_IS_PLAIN && blockSec.hasOnlyAir();
                                     if (blockSecOnlyAir) {
                                         airState = Blocks.AIR.defaultBlockState();
                                     }

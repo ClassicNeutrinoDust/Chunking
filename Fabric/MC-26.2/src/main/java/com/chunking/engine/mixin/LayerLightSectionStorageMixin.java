@@ -158,6 +158,30 @@ public abstract class LayerLightSectionStorageMixin<M extends DataLayerStorageMa
         }
     }
 
+    @Inject(
+            method = "getDataLayer(Lnet/minecraft/world/level/lighting/DataLayerStorageMap;J)Lnet/minecraft/world/level/chunk/DataLayer;",
+            at = @At("HEAD"),
+            cancellable = true
+    )
+    private void chunking$readVisibleLayerSafely(M map, long sectionPos, CallbackInfoReturnable<DataLayer> cir) {
+        if (map != this.visibleSectionData) {
+            return;
+        }
+        long stamp = this.chunking$visibleLock.tryOptimisticRead();
+        LightMaps.ObjTable tbl = this.chunking$visObjTable;
+        DataLayer dl = tbl != null ? tbl.getOptimistic(sectionPos) : null;
+        if (!this.chunking$visibleLock.validate(stamp)) {
+            long rs = this.chunking$visibleLock.readLock();
+            try {
+                tbl = this.chunking$visObjTable;
+                dl = tbl != null ? tbl.getOptimistic(sectionPos) : null;
+            } finally {
+                this.chunking$visibleLock.unlockRead(rs);
+            }
+        }
+        cir.setReturnValue(dl);
+    }
+
     @Override
     public StampedLock chunking$visibleLock() {
         return this.chunking$visibleLock;

@@ -156,7 +156,7 @@ public abstract class NoiseGeneratorMixin {
                         return;
                     }
                 }
-                ci.cancel();
+        ci.cancel();
             }
             return;
         }
@@ -171,13 +171,13 @@ public abstract class NoiseGeneratorMixin {
                 if (rtree != null
                         && (Object) sampler instanceof ClimateSamplerAccess samplerAccess
                         && samplerAccess.chunking$fillBiomesColumnFast(chunkAccess, rtree)) {
-                    ci.cancel();
+        ci.cancel();
                     return;
                 }
             } else if (com.chunking.engine.world.ModCompat.isTerraBlenderInitializedParams(params)
                     && (Object) sampler instanceof ClimateSamplerAccess samplerAccess
                     && samplerAccess.chunking$fillTerraBlenderBiomesColumnFast(chunkAccess, params)) {
-                ci.cancel();
+        ci.cancel();
                 return;
             }
         }
@@ -187,7 +187,7 @@ public abstract class NoiseGeneratorMixin {
         LevelChunkSection[] sections = chunkAccess.getSections();
         int secCount = sections.length;
         if (secCount == 0) {
-            ci.cancel();
+        ci.cancel();
             return;
         }
         int needed = secCount << 6;
@@ -262,6 +262,7 @@ public abstract class NoiseGeneratorMixin {
                 }
             }
         }
+        java.util.Arrays.fill(buf, 0, needed, null);
         ci.cancel();
     }
 

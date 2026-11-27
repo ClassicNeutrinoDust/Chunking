@@ -74,15 +74,10 @@ public abstract class BiomeDecorationMixin {
     private static final ThreadLocal<BitSet> CHUNKING$STEP_BITS_TL = ThreadLocal.withInitial(() -> new BitSet(128));
 
     @Unique
-    private record CachedStructures(Registry<Structure> registry, int size, Structure[][] byStep) {}
+    private record CachedStructures(java.lang.ref.WeakReference<Registry<Structure>> registryRef, int size, Structure[][] byStep) {}
 
     @Unique
     private static volatile CachedStructures chunking$lastStructures;
-
-    @Unique
-    public static void chunking$clearCachedStructures() {
-        chunking$lastStructures = null;
-    }
 
     @Shadow
     @Final
@@ -112,7 +107,7 @@ public abstract class BiomeDecorationMixin {
     private static Structure[][] chunking$getStructuresByStep(Registry<Structure> registry) {
         int size = registry.size();
         CachedStructures cached = chunking$lastStructures;
-        if (cached != null && cached.registry() == registry && cached.size() == size) {
+        if (cached != null && cached.registryRef().get() == registry && cached.size() == size) {
             return cached.byStep();
         }
         @SuppressWarnings("unchecked")
@@ -133,7 +128,7 @@ public abstract class BiomeDecorationMixin {
                     ? CHUNKING$EMPTY_STRUCTURES
                     : list.toArray(CHUNKING$EMPTY_STRUCTURES);
         }
-        chunking$lastStructures = new CachedStructures(registry, size, byStep);
+        chunking$lastStructures = new CachedStructures(new java.lang.ref.WeakReference<>(registry), size, byStep);
         return byStep;
     }
 

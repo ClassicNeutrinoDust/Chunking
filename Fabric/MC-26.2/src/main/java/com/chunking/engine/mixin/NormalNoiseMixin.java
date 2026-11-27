@@ -256,10 +256,19 @@ public abstract class NormalNoiseMixin implements NormalNoiseAccess {
             chunking$initFused();
             octs = this.chunking$fusedOctaves;
         }
-        boolean isCell128 = (count == 128
-                && bx[0] == bx[16] && bz[0] == bz[16]
-                && bx[15] == bx[31] && bz[15] == bz[31]
-                && by[0] == by[15]);
+        boolean isCell128 = false;
+        if (count == 128) {
+            isCell128 = true;
+            for (int layer = 0; layer < 8; layer++) {
+                int off = layer << 4;
+                if (bx[off] != bx[0] || bz[off] != bz[0]
+                        || bx[off + 15] != bx[15] || bz[off + 15] != bz[15]
+                        || by[off] != by[off + 15]) {
+                    isCell128 = false;
+                    break;
+                }
+            }
+        }
         if (yScale == 0.0D && isCell128) {
             java.lang.foreign.MemorySegment nativeOcts = this.chunking$nativeOcts;
             if (CHUNKING$NATIVE_AVX2_ENABLED && nativeOcts != null && NativeAvx2.isAvailable()) {

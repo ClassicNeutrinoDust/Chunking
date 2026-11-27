@@ -148,7 +148,7 @@ public abstract class LevelRendererMixin {
         if (!this.chunking$boostedRenderPriority) {
             this.chunking$boostedRenderPriority = true;
             try {
-                Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
+                Thread.currentThread().setPriority(Math.min(Thread.MAX_PRIORITY, Thread.NORM_PRIORITY + 1));
                 com.chunking.engine.core.ThreadHints.preferHighPerformanceCurrentThread();
             } catch (Throwable ignored) {
             }

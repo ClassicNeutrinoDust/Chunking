@@ -191,7 +191,9 @@ public abstract class LightEngineCacheMixin implements LightEngineAccess {
             if (secIdx == this.chunking$lastSecIdx) {
                 LevelChunkSection sec = this.chunking$lastSection;
                 if (sec != null) {
-                    return sec.hasOnlyAir() ? Blocks.AIR.defaultBlockState() : sec.getBlockState(x & 15, y & 15, z & 15);
+                    return (com.chunking.engine.world.LightSpread.ALL_AIR_IS_PLAIN && sec.hasOnlyAir())
+                            ? Blocks.AIR.defaultBlockState()
+                            : sec.getBlockState(x & 15, y & 15, z & 15);
                 }
             } else {
                 LevelChunkSection[] secs = lastCa.getSections();
@@ -199,7 +201,9 @@ public abstract class LightEngineCacheMixin implements LightEngineAccess {
                     LevelChunkSection sec = secs[secIdx];
                     this.chunking$lastSecIdx = secIdx;
                     this.chunking$lastSection = sec;
-                    return (sec == null || sec.hasOnlyAir()) ? Blocks.AIR.defaultBlockState() : sec.getBlockState(x & 15, y & 15, z & 15);
+                    return (sec == null || (com.chunking.engine.world.LightSpread.ALL_AIR_IS_PLAIN && sec.hasOnlyAir()))
+                            ? Blocks.AIR.defaultBlockState()
+                            : sec.getBlockState(x & 15, y & 15, z & 15);
                 }
                 return (lastCa instanceof ProtoChunk && !(lastCa instanceof ImposterProtoChunk))
                         ? Blocks.VOID_AIR.defaultBlockState()
@@ -224,7 +228,9 @@ public abstract class LightEngineCacheMixin implements LightEngineAccess {
                 this.chunking$lastSecIdx = secIdx;
                 this.chunking$lastSection = sec;
                 this.chunking$lastChunkAccess = ca;
-                return (sec == null || sec.hasOnlyAir()) ? Blocks.AIR.defaultBlockState() : sec.getBlockState(x & 15, y & 15, z & 15);
+                return (sec == null || (com.chunking.engine.world.LightSpread.ALL_AIR_IS_PLAIN && sec.hasOnlyAir()))
+                        ? Blocks.AIR.defaultBlockState()
+                        : sec.getBlockState(x & 15, y & 15, z & 15);
             }
             return (ca instanceof ProtoChunk && !(ca instanceof ImposterProtoChunk))
                     ? Blocks.VOID_AIR.defaultBlockState()

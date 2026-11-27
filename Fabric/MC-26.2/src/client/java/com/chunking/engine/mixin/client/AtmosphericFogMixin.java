@@ -36,6 +36,7 @@ public abstract class AtmosphericFogMixin {
                 || level.dimension() == Level.END
                 || (level.dimensionType().hasCeiling() && fogData.environmentalEnd <= 96.5F))
                 && renderDistanceBlocks > 96.0F
+                && fogData.environmentalEnd >= 16.0F
                 && fogData.environmentalEnd < renderDistanceBlocks) {
             fogData.environmentalStart = Math.max(fogData.environmentalStart, renderDistanceBlocks * 0.25F);
             fogData.environmentalEnd = Math.max(fogData.environmentalEnd, renderDistanceBlocks);

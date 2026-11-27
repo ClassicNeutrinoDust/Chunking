@@ -56,7 +56,10 @@ public abstract class TaskDispatcherMixin implements TaskDispatcherAccess {
     private AtomicBoolean chunking$pumpScheduled;
 
     @Unique
-    private FastLongSet chunking$activePositions;
+    private it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap chunking$activeCounts;
+
+    @Unique
+    private Object chunking$activeLock;
 
     @Unique
     private volatile boolean chunking$closed;
@@ -65,7 +68,8 @@ public abstract class TaskDispatcherMixin implements TaskDispatcherAccess {
     private void chunking$initState(CallbackInfo ci) {
         this.chunking$inFlightBatches = new AtomicInteger();
         this.chunking$pumpScheduled = new AtomicBoolean();
-        this.chunking$activePositions = new FastLongSet(64);
+        this.chunking$activeCounts = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap(64);
+        this.chunking$activeLock = new Object();
     }
 
     // Only ChunkMap's worldgenDispatcher should pump parallel batches; light and ticket throttler stay serial.
@@ -102,8 +106,9 @@ public abstract class TaskDispatcherMixin implements TaskDispatcherAccess {
 
     @Override
     public boolean chunking$isPosActive(long chunkPos) {
-        FastLongSet set = this.chunking$activePositions;
-        return set != null && set.contains(chunkPos);
+        synchronized (this.chunking$activeLock) {
+            return this.chunking$activeCounts != null && this.chunking$activeCounts.containsKey(chunkPos);
+        }
     }
 
     @Inject(method = "close", at = @At("HEAD"))
@@ -125,7 +130,12 @@ public abstract class TaskDispatcherMixin implements TaskDispatcherAccess {
             ci.cancel();
             return;
         }
-        if (!this.chunking$activePositions.contains(pos.pack())) {
+        long packed = pos.pack();
+        boolean active;
+        synchronized (this.chunking$activeLock) {
+            active = this.chunking$activeCounts.containsKey(packed);
+        }
+        if (!active) {
             setQueueLevel.accept(newLevel);
             ci.cancel();
         }
@@ -135,7 +145,16 @@ public abstract class TaskDispatcherMixin implements TaskDispatcherAccess {
     private void chunking$untrackPoppedChunkPos(CallbackInfoReturnable<ChunkTaskPriorityQueue.TasksForChunk> cir) {
         ChunkTaskPriorityQueue.TasksForChunk popped = cir.getReturnValue();
         if (popped != null) {
-            this.chunking$activePositions.remove(popped.chunkPos());
+            long packed = popped.chunkPos();
+            int removed = popped.tasks().size();
+            synchronized (this.chunking$activeLock) {
+                int cur = this.chunking$activeCounts.get(packed);
+                if (cur <= removed) {
+                    this.chunking$activeCounts.remove(packed);
+                } else {
+                    this.chunking$activeCounts.put(packed, cur - removed);
+                }
+            }
         }
     }
 
@@ -150,7 +169,9 @@ public abstract class TaskDispatcherMixin implements TaskDispatcherAccess {
 
     @Inject(method = "submit", at = @At("HEAD"))
     private void chunking$trackSubmittedChunkPos(Runnable runnable, long pos, IntSupplier level, CallbackInfo ci) {
-        this.chunking$activePositions.add(pos);
+        synchronized (this.chunking$activeLock) {
+            this.chunking$activeCounts.addTo(pos, 1);
+        }
     }
 
     @Inject(method = "submit", at = @At("TAIL"))
@@ -166,7 +187,18 @@ public abstract class TaskDispatcherMixin implements TaskDispatcherAccess {
     @Inject(method = "release", at = @At("TAIL"))
     private void chunking$onReleaseWakeParallelPump(long pos, Runnable postRelease, boolean clearQueue, CallbackInfo ci) {
         if (clearQueue) {
-            this.chunking$activePositions.remove(pos);
+            if (this.chunking$closed) {
+                synchronized (this.chunking$activeLock) {
+                    this.chunking$activeCounts.remove(pos);
+                }
+            } else {
+                // Schedule removal at priority 0 so any earlier async onLevelChange for pos finishes first.
+                this.dispatcher.schedule(new StrictQueue.RunnableWithPriority(0, () -> {
+                    synchronized (this.chunking$activeLock) {
+                        this.chunking$activeCounts.remove(pos);
+                    }
+                }));
+            }
         }
         if (this.chunking$closed || chunking$isExcludedDispatcher()) {
             return;
