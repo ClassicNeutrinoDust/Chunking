@@ -1,3 +1,6 @@
+<img width="2048" height="577" alt="minecraft_title" src="https://github.com/user-attachments/assets/67bcb369-9740-4aa2-b8b0-47c7d2c68b39" />
+
+
 # What is Chunking?
 
 Chunking is a fabric mod made to improve the chunk generation, I/O, and loading performance of Minecraft 26.2. This is achieved by taking advantage of multiple CPU cores in parallel, compiling hot worldgen paths, and pacing live chunk streaming so gameplay stays responsive.It is made as superfast alternative to C2ME engine(you can view benchmarks below) and perform faster on low number of threads and with smoother MSPT and FPS.
