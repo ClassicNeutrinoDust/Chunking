@@ -554,7 +554,7 @@ public abstract class LevelChunkSectionMixin implements LevelChunkSectionAccess,
             int fluidMaxExclusiveY
     ) {
         if ((defaultState != null && (defaultState.isRandomlyTicking() || !defaultState.getFluidState().isEmpty()
-                || (defaultState != CHUNKING$AIR_STATE && defaultState.isAir())))
+                || defaultState.isAir()))
                 || (fluidState != null && fluidState != CHUNKING$AIR_STATE && fluidState.isAir())) {
             return false;
         }

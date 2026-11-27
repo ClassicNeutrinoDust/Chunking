@@ -119,7 +119,10 @@ public abstract class RegionFileStorageMixin implements RegionStorageAccess, Raw
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void chunking$disableSyncDiskWritesByDefault(CallbackInfo ci) {
-        this.sync = Boolean.getBoolean("chunking.sync_disk_writes");
+        if (com.chunking.engine.config.ModConfig.FAST_ASYNC_SAVING
+                && !Boolean.getBoolean("chunking.sync_disk_writes")) {
+            this.sync = false;
+        }
         chunking$ensureRegionMap();
         chunking$ensureOnDiskMap();
     }

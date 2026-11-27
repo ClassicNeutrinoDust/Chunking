@@ -366,10 +366,33 @@ public abstract class NoiseBasedAquiferMixin implements AquiferAccess {
         return tl.owner == this && tl.candCount > 0;
     }
 
+    @Unique
+    private boolean chunking$barrierNeedsChunk;
+
+    @org.spongepowered.asm.mixin.injection.Inject(method = "<init>", at = @At("RETURN"))
+    private void chunking$detectBarrierNoiseChunkDep(org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        if (this.barrierNoise == null) {
+            return;
+        }
+        boolean[] found = new boolean[1];
+        try {
+            this.barrierNoise.mapAll(df -> {
+                if (df instanceof net.minecraft.world.level.levelgen.DensityFunctions.MarkerOrMarked
+                        || df instanceof net.minecraft.world.level.levelgen.NoiseChunk.NoiseInterpolator
+                        || !com.chunking.engine.world.ModCompat.isVanillaClass(df.getClass())) {
+                    found[0] = true;
+                }
+                return df;
+            });
+        } catch (Throwable ignored) {
+            found[0] = true;
+        }
+        this.chunking$barrierNeedsChunk = found[0];
+    }
+
     @Override
     public boolean chunking$barrierNeedsNoiseChunk() {
-        return this.barrierNoise instanceof net.minecraft.world.level.levelgen.DensityFunctions.MarkerOrMarked
-                || !com.chunking.engine.world.ModCompat.isVanillaClass(this.barrierNoise.getClass());
+        return this.chunking$barrierNeedsChunk;
     }
 
     @Override
@@ -395,10 +418,7 @@ public abstract class NoiseBasedAquiferMixin implements AquiferAccess {
 
         CellAquiferState tl = CHUNKING$TL_CELL_AQ.get();
         net.minecraft.world.level.levelgen.DensityFunction.FunctionContext pCtx =
-                (this.barrierNoise instanceof net.minecraft.world.level.levelgen.DensityFunctions.MarkerOrMarked
-                        || !com.chunking.engine.world.ModCompat.isVanillaClass(this.barrierNoise.getClass()))
-                        ? ctx
-                        : tl.barrierCtx.set(bx, by, bz);
+                this.chunking$barrierNeedsChunk ? ctx : tl.barrierCtx.set(bx, by, bz);
         int candCount = tl.candCount;
         int d1 = Integer.MAX_VALUE;
         int d2 = Integer.MAX_VALUE;

@@ -43,18 +43,19 @@ public abstract class TagMatchTestMixin {
             return state.is(this.tag);
         }
         Object[] c = this.chunking$cached;
-        if (c != null) {
+        int epoch = BlockTagBits.tagEpoch();
+        if (c != null && (int) c[3] == epoch) {
             @SuppressWarnings("unchecked")
             HolderSet.Named<Block> named = (HolderSet.Named<Block>) c[0];
             if (((HolderSetNamedAccessor) (Object) named).chunking$getContents() == c[1]) {
                 return BlockTagBits.contains((long[]) c[2], state.getBlock());
             }
         }
-        return this.chunking$rebuildAndTest(state);
+        return this.chunking$rebuildAndTest(state, epoch);
     }
 
     @Unique
-    private synchronized boolean chunking$rebuildAndTest(BlockState state) {
+    private synchronized boolean chunking$rebuildAndTest(BlockState state, int epoch) {
         Optional<HolderSet.Named<Block>> opt = BuiltInRegistries.BLOCK.get(this.tag);
         if (opt.isEmpty()) {
             return state.is(this.tag);
@@ -68,7 +69,7 @@ public abstract class TagMatchTestMixin {
             return state.is(this.tag);
         }
         long[] bits = BlockTagBits.build(contents);
-        this.chunking$cached = new Object[]{named, contents, bits};
+        this.chunking$cached = new Object[]{named, contents, bits, epoch};
 
         return BlockTagBits.contains(bits, state.getBlock());
     }

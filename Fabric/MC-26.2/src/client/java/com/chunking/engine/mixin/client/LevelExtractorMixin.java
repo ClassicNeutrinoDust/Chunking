@@ -268,6 +268,9 @@ public abstract class LevelExtractorMixin {
         return selected;
     }
 
+    @Unique
+    private long chunking$lastSectionExtractNs;
+
     @WrapOperation(
             method = "extract",
             at = @At(
@@ -290,6 +293,7 @@ public abstract class LevelExtractorMixin {
         if (this.chunking$extractStartNs == 0L) {
             this.chunking$extractStartNs = now;
         }
+        this.chunking$lastSectionExtractNs = now;
         if (this.chunking$sectionsExtracted >= this.chunking$minSections
                 && (now - this.chunking$extractStartNs) >= this.chunking$budgetNs) {
             return false;
@@ -301,7 +305,12 @@ public abstract class LevelExtractorMixin {
     @Inject(method = "extract", at = @At("RETURN"))
     private void chunking$clearSelectedSections(CallbackInfo ci) {
         if (this.chunking$extractStartNs != 0L) {
-            ClientRuntime.consumeStreamingBudget(System.nanoTime() - this.chunking$extractStartNs);
+            long spent = Math.max(0L, this.chunking$lastSectionExtractNs - this.chunking$extractStartNs);
+            if (spent > 0L) {
+                ClientRuntime.consumeStreamingBudget(spent);
+            }
+            this.chunking$extractStartNs = 0L;
+            this.chunking$lastSectionExtractNs = 0L;
         }
         if (this.chunking$selectedSections != null) {
             this.chunking$selectedSections.clear();

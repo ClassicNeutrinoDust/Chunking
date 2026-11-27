@@ -72,7 +72,8 @@ public final class MixinPlugin implements IMixinConfigPlugin {
             "WoodlandMansionSimpleGridMixin", "TransformationMixin", "RandomizedIntStateProviderMixin",
             "ImprovedNoiseMixin", "PerlinNoiseMixin", "BlendedNoiseMixin", "NormalNoiseMixin",
             "NoiseBasedAquiferMixin", "NoiseGeneratorMixin", "NoiseChunkMixin", "NoiseChunkOreInitMixin",
-            "NoiseInterpolatorMixin", "NoiseFlatCacheMixin", "NoiseSliceProviderMixin", "SurfaceSystemMixin",
+            "NoiseInterpolatorMixin", "NoiseFlatCacheMixin", "NoiseSliceProviderMixin", "NoiseCache2DMixin",
+            "NoiseCacheAllInCellMixin", "SurfaceSystemMixin",
             "ClimateRTreeMixin", "ClimateSamplerMixin", "OptionsMixin", "SodiumConfigBuilderMixin",
             "LevelLightEngineMixin", "LightEngineMixin", "SkyLightEngineMixin", "BlockLightEngineMixin",
             "LayerLightSectionStorageMixin", "SkyLightSectionStorageMixin", "DataLayerStorageMapMixin",
@@ -86,7 +87,8 @@ public final class MixinPlugin implements IMixinConfigPlugin {
             "NoiseInterpolatorMixin",
             "NoiseFlatCacheMixin",
             "NoiseSliceProviderMixin",
-            "NoiseCache2DMixin"
+            "NoiseCache2DMixin",
+            "NoiseCacheAllInCellMixin"
     );
 
     private static final Set<String> RENDERER_CONFLICTS = Set.of(

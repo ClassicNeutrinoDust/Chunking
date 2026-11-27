@@ -17,6 +17,9 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 public final class DebugHud {
     private static final long HUD_FORMAT_INTERVAL_NS = 250_000_000L;
     private static final StringBuilder SB = new StringBuilder(160);
+    private static volatile boolean visible = ModConfig.LIVE_BENCHMARK_HUD;
+    private static net.minecraft.client.KeyMapping toggleKeyMapping;
+    private static net.minecraft.client.KeyMapping resetKeyMapping;
     private static long lastHudFormatNs = 0L;
     private static String l1 = "", l2 = "", l3 = "", l4 = "", l5 = "", l6 = "", l7 = "";
     private static int cachedMaxW = 0;
@@ -24,12 +27,34 @@ public final class DebugHud {
 
     private DebugHud() {}
 
+    public static void setVisible(boolean show) {
+        visible = show;
+    }
+
+    public static void toggleVisible() {
+        visible = !visible;
+    }
+
+    public static void setKeyMappings(
+            net.minecraft.client.KeyMapping toggle,
+            net.minecraft.client.KeyMapping reset
+    ) {
+        toggleKeyMapping = toggle;
+        resetKeyMapping = reset;
+    }
+
+    public static void resetDisplay() {
+        lastHudFormatNs = 0L;
+        cachedMaxW = 0;
+    }
+
     public static void render(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
-        if (!ModConfig.LIVE_BENCHMARK_HUD) {
+        if (!visible) {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
-        if (mc == null || mc.level == null || mc.options == null || mc.font == null) {
+        if (mc == null || mc.level == null || mc.options == null || mc.font == null
+                || (mc.gui != null && mc.gui.screen() != null)) {
             return;
         }
 
@@ -45,10 +70,13 @@ public final class DebugHud {
             lastHighMspt = s.msptMs > 30.0D;
 
             StringBuilder sb = SB;
+            String hideKey = toggleKeyMapping != null ? toggleKeyMapping.getTranslatedKeyMessage().getString() : "F7";
+            String resetKey = resetKeyMapping != null ? resetKeyMapping.getTranslatedKeyMessage().getString() : "F9";
 
             sb.setLength(0);
             sb.append("Chunking Live Bench [").append(s.workers).append("W | ")
-                    .append(s.govLevel).append("]  (F7: Hide  F9: Reset)");
+                    .append(s.govLevel).append("]  (").append(hideKey).append(": Hide  ")
+                    .append(resetKey).append(": Reset)");
             l1 = sb.toString();
 
             sb.setLength(0);

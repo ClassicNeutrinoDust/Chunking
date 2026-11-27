@@ -212,11 +212,26 @@ public abstract class PalettedContainerLockMixin<T> {
             for (int i = 0; i < entryCount; i++) {
                 counts[buf[i]]++;
             }
+            // Snapshot non-zero counts before invoking consumer so re-entrant count()/pack() calls cannot clobber scratch.
+            int nonZero = 0;
+            for (int id = 0; id < palSize; id++) {
+                if (counts[id] != 0) {
+                    nonZero++;
+                }
+            }
+            int[] snapIds = new int[nonZero];
+            int[] snapCounts = new int[nonZero];
+            int k = 0;
             for (int id = 0; id < palSize; id++) {
                 int c = counts[id];
                 if (c != 0) {
-                    consumer.accept(pal.valueFor(id), c);
+                    snapIds[k] = id;
+                    snapCounts[k] = c;
+                    k++;
                 }
+            }
+            for (int i = 0; i < nonZero; i++) {
+                consumer.accept(pal.valueFor(snapIds[i]), snapCounts[i]);
             }
             return;
         }

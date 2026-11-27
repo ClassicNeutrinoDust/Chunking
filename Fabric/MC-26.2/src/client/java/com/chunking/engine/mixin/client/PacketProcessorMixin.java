@@ -53,8 +53,10 @@ public abstract class PacketProcessorMixin {
             return;
         }
 
+        if (mc.level == null) {
+            return;
+        }
         FrameGuard gov = FrameGuard.get();
-        long startNs = System.nanoTime();
         long budgetNs = gov.packetBudgetNs();
         int minChunks = gov.minChunkPacketsPerFrame();
         int maxChunks = gov.maxChunkPacketsPerFrame();
@@ -92,6 +94,7 @@ public abstract class PacketProcessorMixin {
         maxChunks = Math.max(minChunks, maxChunks);
 
         int chunksHandled = 0;
+        long chunkSpentNs = 0L;
 
         while (!this.closed) {
             Object next = this.packetsToBeHandled.peek();
@@ -105,7 +108,7 @@ public abstract class PacketProcessorMixin {
             boolean isChunkPkt = pkt instanceof ClientboundLevelChunkWithLightPacket;
 
             if (isChunkPkt && chunksHandled >= minChunks) {
-                if (chunksHandled >= maxChunks || (System.nanoTime() - startNs) >= budgetNs) {
+                if (chunksHandled >= maxChunks || chunkSpentNs >= budgetNs) {
                     break;
                 }
             }
@@ -114,13 +117,17 @@ public abstract class PacketProcessorMixin {
             if (item == null) {
                 break;
             }
-            ((QueuedPacketAccess) item).chunking$handle();
             if (isChunkPkt) {
+                long t0 = System.nanoTime();
+                ((QueuedPacketAccess) item).chunking$handle();
+                chunkSpentNs += Math.max(0L, System.nanoTime() - t0);
                 chunksHandled++;
+            } else {
+                ((QueuedPacketAccess) item).chunking$handle();
             }
         }
         if (chunksHandled > 0) {
-            ClientRuntime.consumeStreamingBudget(System.nanoTime() - startNs);
+            ClientRuntime.consumeStreamingBudget(chunkSpentNs);
         }
         ci.cancel();
     }

@@ -107,8 +107,6 @@ public abstract class PalettedContainerMixin<T> implements PalettedContainerAcce
     @Unique private T chunking$idCacheDefVal;
     @Unique private int chunking$idCacheDefId;
 
-    @Unique private T chunking$cachedSingleValue;
-    @Unique private Object chunking$cachedSingleData;
     @Unique private byte chunking$strategyKind;
 
     @Unique
@@ -219,8 +217,6 @@ public abstract class PalettedContainerMixin<T> implements PalettedContainerAcce
         this.chunking$lastPrevPalette = null;
         this.chunking$hasPrevId = false;
         this.chunking$idCachePalette = null;
-        this.chunking$cachedSingleValue = null;
-        this.chunking$cachedSingleData = null;
         this.chunking$resizedDuringIdFor = true;
     }
 
@@ -238,8 +234,7 @@ public abstract class PalettedContainerMixin<T> implements PalettedContainerAcce
             if (pal instanceof SingleValuePalette) {
                 if (CHUNKING$SINGLE_VAL_SETTER != null) {
                     CHUNKING$SINGLE_VAL_SETTER.invokeExact((Object) pal, (Object) value);
-                    this.chunking$cachedSingleValue = value;
-                    this.chunking$cachedSingleData = d;
+                    java.lang.invoke.VarHandle.releaseFence();
                     this.chunking$lastPalette = null;
                     this.chunking$lastPrevPalette = null;
                     this.chunking$hasPrevId = false;
@@ -247,8 +242,6 @@ public abstract class PalettedContainerMixin<T> implements PalettedContainerAcce
                     return true;
                 }
                 if (pal.valueFor(0) == value) {
-                    this.chunking$cachedSingleValue = value;
-                    this.chunking$cachedSingleData = d;
                     return true;
                 }
             }
@@ -264,18 +257,9 @@ public abstract class PalettedContainerMixin<T> implements PalettedContainerAcce
         }
         try {
             PalettedDataAccess<T> d = chunking$data();
-            T cached = this.chunking$cachedSingleValue;
-            if (cached != null && this.chunking$cachedSingleData == d) {
-                return cached;
-            }
             if (d.chunking$storage() instanceof ZeroBitStorage) {
-                T val = d.chunking$palette().valueFor(0);
-                this.chunking$cachedSingleValue = val;
-                this.chunking$cachedSingleData = d;
-                return val;
+                return d.chunking$palette().valueFor(0);
             }
-            this.chunking$cachedSingleValue = null;
-            this.chunking$cachedSingleData = null;
         } catch (Throwable ignored) {
         }
         return null;

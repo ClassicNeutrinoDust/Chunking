@@ -23,9 +23,11 @@ public final class ChunkingMod implements ModInitializer {
         ChunkEngine.get().velocityTracker().clear();
         com.chunking.engine.scheduler.FrameGuard.get().resetSession();
         com.chunking.engine.scheduler.TaskQueue.resetSession();
+        com.chunking.engine.scheduler.LoadPacer.resetSession();
         com.chunking.engine.scheduler.TickBudget.resetSession();
         com.chunking.engine.core.LiveStats.get().resetSession();
         com.chunking.engine.world.ModCompat.resetSession();
+        com.chunking.engine.world.BlockTagBits.invalidateTagCache();
         com.chunking.engine.io.EncodedCache.clear();
         com.chunking.engine.io.SectionWriter.clearBiomeCache();
         com.chunking.engine.io.SectionReader.clearBiomeCache();
@@ -44,6 +46,11 @@ public final class ChunkingMod implements ModInitializer {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
                 ChunkingCommand.register(dispatcher));
         ServerLifecycleEvents.SERVER_STARTING.register(server -> resetSessionState());
+        ServerLifecycleEvents.END_DATA_PACK_RELOAD.register((server, resourceManager, success) -> {
+            if (success) {
+                com.chunking.engine.world.BlockTagBits.invalidateTagCache();
+            }
+        });
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
             resetSessionState();
             if (!ModConfig.isClientEnvironment()) {

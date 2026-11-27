@@ -191,13 +191,8 @@ public abstract class PlayerChunkSenderMixin {
             adaptiveRate = Math.min(adaptiveRate, 16.0F);
         }
 
-        if (clientActive) {
-            this.desiredChunksPerTick = adaptiveRate;
-            this.batchQuota = scaledQuota;
-        } else {
-            this.desiredChunksPerTick = scaledQuota;
-            this.batchQuota = 0.0F;
-        }
+        this.desiredChunksPerTick = scaledQuota;
+        this.batchQuota = 0.0F;
         if (clientActive && this.memoryConnection) {
             this.maxUnacknowledgedBatches = (lastTickMs > 35.0D) ? 2 : 10;
         } else if (severeTick) {

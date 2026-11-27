@@ -12,8 +12,17 @@ import com.chunking.engine.access.BlockIdAccess;
  */
 public final class BlockTagBits {
     private static final long[] EMPTY = new long[0];
+    private static volatile int tagEpoch = 1;
 
     private BlockTagBits() {}
+
+    public static int tagEpoch() {
+        return tagEpoch;
+    }
+
+    public static void invalidateTagCache() {
+        tagEpoch++;
+    }
 
     private static int blockId(Block block) {
         return (block instanceof BlockIdAccess acc)

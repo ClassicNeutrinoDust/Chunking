@@ -78,6 +78,20 @@ public final class WorkerPool implements AutoCloseable {
                 }
             });
         } catch (java.util.concurrent.RejectedExecutionException rejected) {
+            ForkJoinPool retryPool = this.pool;
+            if (!this.closed.get() && retryPool != null && retryPool != targetPool && !retryPool.isShutdown()) {
+                try {
+                    retryPool.execute(() -> {
+                        try {
+                            command.run();
+                        } finally {
+                            this.completedTasks.increment();
+                        }
+                    });
+                    return;
+                } catch (java.util.concurrent.RejectedExecutionException ignored) {
+                }
+            }
             command.run();
             this.completedTasks.increment();
         }
@@ -119,6 +133,7 @@ public final class WorkerPool implements AutoCloseable {
         this.workers = clamped;
         this.maxConcurrentDispatches = Math.max(clamped * 3, ModConfig.effectiveMaxConcurrentDispatches());
         this.pool = createPool(clamped);
+        FrameGuard.get().updateMaxWorkers(clamped);
         if (previous != null) {
             previous.shutdown();
         }

@@ -37,11 +37,13 @@ public final class ChunkingCommand {
     }
 
     private static boolean hasAccess(CommandSourceStack source) {
-        MinecraftServer server = source.getServer();
-        if (server != null && !server.isDedicatedServer()) {
+        if (source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER) || source.getEntity() == null) {
             return true;
         }
-        return source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
+        MinecraftServer server = source.getServer();
+        net.minecraft.server.level.ServerPlayer player = source.getPlayer();
+        return server != null && !server.isDedicatedServer()
+                && player != null && server.isSingleplayerOwner(player.nameAndId());
     }
 
     private static int showStatus(CommandSourceStack source) {
@@ -88,14 +90,14 @@ public final class ChunkingCommand {
 
     private static int setWorkers(CommandSourceStack source, int count, boolean auto) {
         int clamped = Math.max(1, Math.min(256, count));
-        ModConfig.WORLDGEN_WORKERS = clamped;
-        ChunkEngine.get().workerPool().setParallelism(clamped);
+        ModConfig.setConfiguredWorkers(auto ? 0 : clamped);
+        ChunkEngine.get().workerPool().setParallelism(ModConfig.WORLDGEN_WORKERS);
         ModConfig.save();
         String msg = auto
-                ? "[Chunking] Workers reset to auto (" + clamped + ") and saved."
+                ? "[Chunking] Workers reset to auto (" + ModConfig.WORLDGEN_WORKERS + ") and saved."
                 : "[Chunking] Workers set to " + clamped + " and saved.";
         source.sendSuccess(() -> Component.literal(msg), true);
-        return clamped;
+        return ModConfig.WORLDGEN_WORKERS;
     }
 
     private static int reloadConfig(CommandSourceStack source) {

@@ -200,7 +200,8 @@ public abstract class NoiseGeneratorMixin {
         int baseQz = net.minecraft.core.QuartPos.fromBlock(chunkAccess.getPos().getMinBlockZ());
         int minQy = net.minecraft.core.QuartPos.fromBlock(chunkAccess.getMinY());
         var localSource = com.chunking.engine.world.ModCompat.threadLocalBiomeSource(biomeSource);
-        boolean endColumnInvariant = biomeSource.getClass() == net.minecraft.world.level.biome.TheEndBiomeSource.class
+        boolean endColumnInvariant = biomeSource instanceof net.minecraft.world.level.biome.TheEndBiomeSource endSrc
+                && com.chunking.engine.world.ModCompat.isVanillaUnmodifiedEndBiomeSource(endSrc)
                 && (Object) sampler instanceof ClimateSamplerAccess samplerAccess
                 && samplerAccess.chunking$isErosionYInvariant();
         if (endColumnInvariant) {

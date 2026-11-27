@@ -79,6 +79,11 @@ public abstract class BiomeDecorationMixin {
     @Unique
     private static volatile CachedStructures chunking$lastStructures;
 
+    @Unique
+    public static void chunking$clearCachedStructures() {
+        chunking$lastStructures = null;
+    }
+
     @Shadow
     @Final
     protected BiomeSource biomeSource;

@@ -62,6 +62,7 @@ public final class TaskQueue {
     private static final AtomicLong NON_EMPTY_MASK = new AtomicLong(0L);
     private static final AtomicInteger IN_FLIGHT = new AtomicInteger();
     private static final AtomicInteger QUEUED_COUNT = new AtomicInteger();
+    private static final AtomicInteger PUMP_WIP = new AtomicInteger();
     private static final AtomicBoolean REBALANCING = new AtomicBoolean(false);
 
     // Single-owner scratch buffers guarded exclusively by REBALANCING CAS
@@ -417,22 +418,32 @@ public final class TaskQueue {
     }
 
     private static void pump(Executor pool) {
-        while (true) {
-            int cap = effectiveUpstreamCap();
-            int cur = IN_FLIGHT.get();
-            if (cur >= cap) {
-                return;
-            }
-            if (!IN_FLIGHT.compareAndSet(cur, cur + 1)) {
-                continue;
-            }
-            PrioritizedTask<?> next = pollHighestPriority();
-            if (next == null) {
-                IN_FLIGHT.decrementAndGet();
-                ChunkEngine.get().featureLock().pumpPending();
-                return;
-            }
-            dispatch(next, pool);
+        if (PUMP_WIP.getAndIncrement() != 0) {
+            return;
+        }
+        try {
+            do {
+                while (true) {
+                    int cap = effectiveUpstreamCap();
+                    int cur = IN_FLIGHT.get();
+                    if (cur >= cap) {
+                        break;
+                    }
+                    if (!IN_FLIGHT.compareAndSet(cur, cur + 1)) {
+                        continue;
+                    }
+                    PrioritizedTask<?> next = pollHighestPriority();
+                    if (next == null) {
+                        IN_FLIGHT.decrementAndGet();
+                        ChunkEngine.get().featureLock().pumpPending();
+                        break;
+                    }
+                    dispatch(next, pool);
+                }
+            } while (PUMP_WIP.decrementAndGet() > 0);
+        } catch (Throwable t) {
+            PUMP_WIP.set(0);
+            throw t;
         }
     }
 

@@ -67,7 +67,7 @@ public abstract class ClientLevelMixin {
                 budgetNs = Math.max(budgetNs, 2_000_000L);
             }
         }
-        if (!ClientRuntime.isInGuiTransition()) {
+        if (qSize < 1000 && !ClientRuntime.isInGuiTransition()) {
             long sharedNs = ClientRuntime.remainingStreamingBudgetNs(budgetNs);
             budgetNs = Math.min(budgetNs, Math.max(200_000L, sharedNs));
         }

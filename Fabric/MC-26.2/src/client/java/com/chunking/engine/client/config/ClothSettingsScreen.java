@@ -2,8 +2,10 @@ package com.chunking.engine.client.config;
 
 import com.chunking.engine.ChunkingMod;
 import com.chunking.engine.client.ClientRuntime;
+import com.chunking.engine.client.DebugHud;
 import com.chunking.engine.config.ModConfig;
 import com.chunking.engine.core.ChunkEngine;
+import com.chunking.engine.mixin.MixinPlugin;
 import com.chunking.engine.scheduler.FrameGuard;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
@@ -29,49 +31,26 @@ final class ClothSettingsScreen {
 
         ConfigEntryBuilder entries = builder.entryBuilder();
 
-        ConfigCategory visuals = builder.getOrCreateCategory(Component.literal("Render Distance & Visuals"));
+        ConfigCategory performance = builder.getOrCreateCategory(Component.literal("Performance"));
 
-        int clampedRenderDistance = Math.max(8, Math.min(64, ModConfig.FULL_CHUNK_RADIUS));
-        visuals.addEntry(entries.startIntSlider(Component.literal("Max Render Distance"), clampedRenderDistance, 8, 64)
-                .setDefaultValue(64)
-                .setTooltip(Component.literal("Maximum real chunk render distance allowed on the video slider (up to 64 chunks)."))
-                .setSaveConsumer(val -> ModConfig.FULL_CHUNK_RADIUS = val)
-                .build());
-
-        visuals.addEntry(entries.startBooleanToggle(Component.literal("Scale Fog"), ModConfig.SCALE_DIMENSION_FOG)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Scales Nether and End fog distance to match your Render Distance."))
-                .setSaveConsumer(val -> ModConfig.SCALE_DIMENSION_FOG = val)
-                .build());
-
-        visuals.addEntry(entries.startBooleanToggle(Component.literal("Reduce Blur"), ModConfig.REDUCE_SCREEN_BLUR)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Disables in-game menu background blur passes that can cause frame hitches."))
-                .setSaveConsumer(val -> ModConfig.REDUCE_SCREEN_BLUR = val)
-                .build());
-
-        ConfigCategory worldgen = builder.getOrCreateCategory(Component.literal("Worldgen & Performance"));
-
-        int maxSliderWorkers = Math.max(32, Math.min(256, Runtime.getRuntime().availableProcessors()));
-        int clampedWorkers = Math.max(1, Math.min(maxSliderWorkers, ModConfig.WORLDGEN_WORKERS));
-        worldgen.addEntry(entries.startIntSlider(Component.literal("Workers"), clampedWorkers, 1, maxSliderWorkers)
-                .setDefaultValue(ModConfig.defaultWorldgenWorkers())
-                .setTooltip(Component.literal("Parallel worldgen worker threads (applied live on save)."))
+        int maxSliderWorkers = Math.max(4, Math.min(64, Runtime.getRuntime().availableProcessors()));
+        int currentWorkers = Math.max(0, Math.min(maxSliderWorkers, ModConfig.CONFIGURED_WORLDGEN_WORKERS));
+        performance.addEntry(entries.startIntSlider(Component.literal("Worldgen Threads"), currentWorkers, 0, maxSliderWorkers)
+                .setDefaultValue(0)
+                .setTextGetter(val -> val == 0
+                        ? Component.literal("Auto (" + ModConfig.defaultWorldgenWorkers() + ")")
+                        : Component.literal(val + (val == 1 ? " thread" : " threads")))
+                .setTooltip(Component.literal("CPU threads used for world generation. Auto picks a safe count for your PC. Restart recommended after changing."))
+                .requireRestart()
                 .setSaveConsumer(val -> {
-                    ModConfig.WORLDGEN_WORKERS = val;
-                    ChunkEngine.get().workerPool().setParallelism(val);
+                    ModConfig.setConfiguredWorkers(val);
+                    ChunkEngine.get().workerPool().setParallelism(ModConfig.WORLDGEN_WORKERS);
                 })
                 .build());
 
-        worldgen.addEntry(entries.startBooleanToggle(Component.literal("Live Debug HUD"), ModConfig.LIVE_BENCHMARK_HUD)
-                .setDefaultValue(false)
-                .setTooltip(Component.literal("Shows live FPS, 1% lows, MSPT, chunk speed, and stage timings (rebindable in Controls)."))
-                .setSaveConsumer(val -> ModConfig.LIVE_BENCHMARK_HUD = val)
-                .build());
-
-        worldgen.addEntry(entries.startBooleanToggle(Component.literal("Smooth Frame Guard"), ModConfig.ADAPTIVE_GOVERNOR)
+        performance.addEntry(entries.startBooleanToggle(Component.literal("Smooth Gameplay Mode"), ModConfig.ADAPTIVE_GOVERNOR)
                 .setDefaultValue(true)
-                .setTooltip(Component.literal("Watches frame time, tick time, and GC pressure to pace background chunk work before hitches occur."))
+                .setTooltip(Component.literal("Paces background chunk loading so FPS and TPS stay smooth while flying or exploring. Automatically bypassed during Chunky pregeneration."))
                 .setSaveConsumer(val -> {
                     ModConfig.ADAPTIVE_GOVERNOR = val;
                     if (val) {
@@ -82,22 +61,37 @@ final class ClothSettingsScreen {
                 })
                 .build());
 
-        worldgen.addEntry(entries.startBooleanToggle(Component.literal("Parallel Worldgen"), ModConfig.PARALLEL_STATUS_TASKS)
+        performance.addEntry(entries.startBooleanToggle(Component.literal("Fast Chunk Saving"), ModConfig.FAST_ASYNC_SAVING)
                 .setDefaultValue(true)
-                .setTooltip(Component.literal("Runs worldgen stages across all worker threads."))
-                .setSaveConsumer(val -> ModConfig.PARALLEL_STATUS_TASKS = val)
+                .setTooltip(Component.literal("Saves chunks asynchronously in the background. Turn off for stricter crash-safe disk flushes."))
+                .setSaveConsumer(val -> ModConfig.FAST_ASYNC_SAVING = val)
                 .build());
 
-        worldgen.addEntry(entries.startBooleanToggle(Component.literal("Fast Math & Noise"), ModConfig.SIMD_NOISE)
+        ConfigCategory visuals = builder.getOrCreateCategory(Component.literal("Visuals & HUD"));
+
+        int clampedRenderDistance = Math.max(32, Math.min(64, ModConfig.FULL_CHUNK_RADIUS));
+        var rdEntry = entries.startIntSlider(Component.literal("Max Render Distance"), clampedRenderDistance, 32, 64)
+                .setDefaultValue(64)
+                .setTooltip(Component.literal("Maximum Render Distance allowed on the Video Settings slider (32 to 64 chunks)."))
+                .setSaveConsumer(val -> ModConfig.FULL_CHUNK_RADIUS = val);
+        if (MixinPlugin.isSodiumLoaded()) {
+            rdEntry.requireRestart();
+        }
+        visuals.addEntry(rdEntry.build());
+
+        visuals.addEntry(entries.startBooleanToggle(Component.literal("Better Nether & End Fog"), ModConfig.SCALE_DIMENSION_FOG)
                 .setDefaultValue(true)
-                .setTooltip(Component.literal("Uses fast noise and terrain evaluation kernels."))
-                .setSaveConsumer(val -> ModConfig.SIMD_NOISE = val)
+                .setTooltip(Component.literal("Extends Nether and End fog to match your Render Distance. Automatically yields if Voxy or Distant Horizons is installed."))
+                .setSaveConsumer(val -> ModConfig.SCALE_DIMENSION_FOG = val)
                 .build());
 
-        worldgen.addEntry(entries.startBooleanToggle(Component.literal("Load Ahead of Camera"), ModConfig.VELOCITY_CONE_SCHEDULER)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Prioritizes chunks ahead of your movement and look direction."))
-                .setSaveConsumer(val -> ModConfig.VELOCITY_CONE_SCHEDULER = val)
+        visuals.addEntry(entries.startBooleanToggle(Component.literal("Show Performance HUD on Launch"), ModConfig.LIVE_BENCHMARK_HUD)
+                .setDefaultValue(false)
+                .setTooltip(Component.literal("Shows FPS, MSPT, and chunk speed automatically on startup. Press F7 in-game anytime to toggle it temporarily."))
+                .setSaveConsumer(val -> {
+                    ModConfig.LIVE_BENCHMARK_HUD = val;
+                    DebugHud.setVisible(val);
+                })
                 .build());
 
         return builder.build();

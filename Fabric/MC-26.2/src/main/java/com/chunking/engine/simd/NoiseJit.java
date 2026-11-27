@@ -2549,7 +2549,7 @@ public final class NoiseJit {
             Label checkIntervals = cb.newLabel();
             cb.fload(coordLoc);
             cb.loadConstant(locs[0]);
-            cb.fcmpl();
+            cb.fcmpg();
             cb.ifge(checkIntervals);
             emitInlineSplineFloat(m.children[0], allowCse);
             emitLinearExtend(coordLoc, locs[0], derivs[0]);
@@ -2560,7 +2560,7 @@ public final class NoiseJit {
                 Label nextInt = cb.newLabel();
                 cb.fload(coordLoc);
                 cb.loadConstant(locs[k + 1]);
-                cb.fcmpl();
+                cb.fcmpg();
                 cb.ifge(nextInt);
 
                 // Hermite interpolation on [locs[k], locs[k+1]]

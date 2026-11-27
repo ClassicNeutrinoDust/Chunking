@@ -824,6 +824,9 @@ public abstract class NoiseChunkMixin implements NoiseSliceEval {
         return oreRandom;
     }
 
+    @Unique
+    private boolean chunking$routerScopeEntered;
+
     @com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation(
             method = "<init>",
             at = @At(
@@ -868,12 +871,19 @@ public abstract class NoiseChunkMixin implements NoiseSliceEval {
         }
         net.minecraft.world.level.levelgen.NoiseRouter wrapped;
         if (scope) {
+            this.chunking$routerScopeEntered = true;
             com.chunking.engine.world.RouterCache.beginNewChunk();
             try {
                 wrapped = original.call(router, visitor);
                 com.chunking.engine.world.RouterCache.seedIdempotent(wrapped.finalDensity());
+            } catch (Throwable t) {
+                this.chunking$routerScopeEntered = false;
+                com.chunking.engine.world.RouterCache.endNewChunk();
+                throw t;
             } finally {
-                com.chunking.engine.world.RouterCache.pauseScope();
+                if (this.chunking$routerScopeEntered) {
+                    com.chunking.engine.world.RouterCache.pauseScope();
+                }
             }
         } else {
             wrapped = original.call(router, visitor);
@@ -910,7 +920,10 @@ public abstract class NoiseChunkMixin implements NoiseSliceEval {
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void chunking$endRouterWrapCacheScopeOnInitReturn(CallbackInfo ci) {
-        com.chunking.engine.world.RouterCache.endNewChunk();
+        if (this.chunking$routerScopeEntered) {
+            this.chunking$routerScopeEntered = false;
+            com.chunking.engine.world.RouterCache.endNewChunk();
+        }
     }
 
     @Inject(
@@ -1124,7 +1137,7 @@ public abstract class NoiseChunkMixin implements NoiseSliceEval {
             return false;
         }
         NoiseInterpolatorAccess vtInterp = this.chunking$veinToggleInterp;
-        if (vtInterp == null) {
+        if (vtInterp == null || cellYHi + 1 >= chunking$getOreVeinSliceCount(this.cellCountY + 1)) {
             return false;
         }
         double[] minMax = CHUNKING$VT_RANGE_TL.get();
@@ -1346,7 +1359,7 @@ public abstract class NoiseChunkMixin implements NoiseSliceEval {
         if (fullCell != null) {
             double[] fullVals = fullCell.chunking$cellValues();
             CellSkipper est = null;
-            if (this.chunking$vanillaFillSlice) {
+            if (this.chunking$vanillaFillSlice && this.cellCountXZ > 1) {
                 est = this.chunking$cellEstimator;
                 if (est == null && !this.chunking$checkedEstimator) {
                     this.chunking$checkedEstimator = true;

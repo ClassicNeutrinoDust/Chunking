@@ -203,7 +203,7 @@ public abstract class ClimateSamplerMixin implements ClimateSamplerAccess {
             }
             if ("Marker".equals(cn)) {
                 if (df instanceof net.minecraft.world.level.levelgen.DensityFunctions.MarkerOrMarked m
-                        && "BLEND_DENSITY".equals(m.type().name())) {
+                        && "BlendDensity".equals(m.type().name())) {
                     ok[0] = false;
                 }
                 return df;
@@ -269,7 +269,7 @@ public abstract class ClimateSamplerMixin implements ClimateSamplerAccess {
                 }
                 if ("Marker".equals(cn)
                         && df instanceof DensityFunctions.MarkerOrMarked mom
-                        && !"BLEND_DENSITY".equals(mom.type().name())) {
+                        && !"BlendDensity".equals(mom.type().name())) {
                     df = mom.wrapped();
                     continue;
                 }

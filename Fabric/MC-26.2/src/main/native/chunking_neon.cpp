@@ -274,13 +274,19 @@ CHUNKING_EXPORT void chunking_avx2_blended_col(
             }
         }
 
-        if (!anyMin) {
+        if (!anyMin && !anyMax) {
+            for (int32_t i = 0; i < tile; i++) outTile[i] = mainBuf[i];
+        } else if (!anyMin) {
             for (int32_t i = 0; i < tile; i++) outTile[i] = (maxBuf[i] / 512.0) / 128.0;
         } else if (!anyMax) {
             for (int32_t i = 0; i < tile; i++) outTile[i] = (minBuf[i] / 512.0) / 128.0;
         } else {
             for (int32_t i = 0; i < tile; i++) {
                 const double b = mainBuf[i];
+                if (!(b == b)) {
+                    outTile[i] = b;
+                    continue;
+                }
                 double clamped;
                 if (b <= 0.0) clamped = minBuf[i] / 512.0;
                 else if (b >= 1.0) clamped = maxBuf[i] / 512.0;

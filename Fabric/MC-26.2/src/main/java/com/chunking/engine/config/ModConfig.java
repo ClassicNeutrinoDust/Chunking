@@ -10,6 +10,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
@@ -27,9 +28,11 @@ public final class ModConfig {
     public static volatile boolean FAST_SURFACE_RULES;
     public static volatile boolean VELOCITY_CONE_SCHEDULER;
     public static volatile boolean ADAPTIVE_GOVERNOR;
+    public static volatile boolean FAST_ASYNC_SAVING;
     public static volatile boolean LIVE_BENCHMARK_HUD;
     public static volatile boolean SCALE_DIMENSION_FOG;
     public static volatile boolean REDUCE_SCREEN_BLUR;
+    public static volatile int CONFIGURED_WORLDGEN_WORKERS;
     public static volatile int WORLDGEN_WORKERS;
     public static final int MAX_CONCURRENT_DISPATCHES;
 
@@ -50,16 +53,26 @@ public final class ModConfig {
     private ModConfig() {}
 
     private static void applyProperties() {
-        FULL_CHUNK_RADIUS = integer("chunking.full_chunk_radius", "full_chunk_radius", 64, 8, 64);
+        FULL_CHUNK_RADIUS = integer("chunking.full_chunk_radius", "full_chunk_radius", 64, 32, 64);
         PARALLEL_STATUS_TASKS = bool("chunking.parallel_status_tasks", "parallel_status_tasks", true);
         SIMD_NOISE = bool("chunking.simd_noise", "simd_noise", true);
         FAST_SURFACE_RULES = bool("chunking.fast_surface_rules", "fast_surface_rules", true);
         VELOCITY_CONE_SCHEDULER = bool("chunking.velocity_cone_scheduler", "velocity_cone_scheduler", true);
         ADAPTIVE_GOVERNOR = bool("chunking.adaptive_governor", "adaptive_governor", true);
+        FAST_ASYNC_SAVING = bool("chunking.fast_async_saving", "fast_async_saving", true);
         LIVE_BENCHMARK_HUD = bool("chunking.live_benchmark_hud", "live_benchmark_hud", false);
         SCALE_DIMENSION_FOG = bool("chunking.scale_dimension_fog", "scale_dimension_fog", true);
-        REDUCE_SCREEN_BLUR = bool("chunking.reduce_screen_blur", "reduce_screen_blur", true);
-        WORLDGEN_WORKERS = integer("chunking.worldgen_workers", "worldgen_workers", defaultWorldgenWorkers(), 1, 256);
+        REDUCE_SCREEN_BLUR = bool("chunking.reduce_screen_blur", "reduce_screen_blur", false);
+
+        int rawWorkers = integer("chunking.worldgen_workers", "worldgen_workers", 0, 0, 256);
+        CONFIGURED_WORLDGEN_WORKERS = rawWorkers;
+        WORLDGEN_WORKERS = rawWorkers == 0 ? defaultWorldgenWorkers() : rawWorkers;
+    }
+
+    public static void setConfiguredWorkers(int configured) {
+        int clamped = Math.max(0, Math.min(256, configured));
+        CONFIGURED_WORLDGEN_WORKERS = clamped;
+        WORLDGEN_WORKERS = clamped == 0 ? defaultWorldgenWorkers() : clamped;
     }
 
     private static Path resolveConfigPath() {
@@ -127,25 +140,38 @@ public final class ModConfig {
         applyProperties();
         ChunkEngine.get().workerPool().setParallelism(WORLDGEN_WORKERS);
         if (ADAPTIVE_GOVERNOR) {
-            FrameGuard.get().start(ChunkEngine.get().workerPool().parallelism(), ChunkingMod.LOGGER::info);
+            FrameGuard.get().start(WORLDGEN_WORKERS, ChunkingMod.LOGGER::info);
         } else {
             FrameGuard.get().stop();
         }
     }
 
     public static synchronized void save() {
-        Properties props = new Properties();
-        props.setProperty("full_chunk_radius", Integer.toString(FULL_CHUNK_RADIUS));
-        props.setProperty("parallel_status_tasks", Boolean.toString(PARALLEL_STATUS_TASKS));
-        props.setProperty("simd_noise", Boolean.toString(SIMD_NOISE));
-        props.setProperty("fast_surface_rules", Boolean.toString(FAST_SURFACE_RULES));
-        props.setProperty("velocity_cone_scheduler", Boolean.toString(VELOCITY_CONE_SCHEDULER));
-        props.setProperty("adaptive_governor", Boolean.toString(ADAPTIVE_GOVERNOR));
-        props.setProperty("live_benchmark_hud", Boolean.toString(LIVE_BENCHMARK_HUD));
-        props.setProperty("scale_dimension_fog", Boolean.toString(SCALE_DIMENSION_FOG));
-        props.setProperty("reduce_screen_blur", Boolean.toString(REDUCE_SCREEN_BLUR));
-        props.setProperty("worldgen_workers", Integer.toString(WORLDGEN_WORKERS));
-        props.setProperty("max_concurrent_dispatches", Integer.toString(effectiveMaxConcurrentDispatches()));
+        String text = ""
+                + "# ===================================================================\n"
+                + "# Chunking Engine Configuration\n"
+                + "# Most changes apply immediately, or on restart if noted.\n"
+                + "# ===================================================================\n\n"
+                + "# --- Performance ---\n\n"
+                + "# Number of world generation threads (0 = Auto, 1-256 = manual).\n"
+                + "# Auto picks a safe count for your CPU and RAM. Restart recommended after changing.\n"
+                + "worldgen_workers=" + CONFIGURED_WORLDGEN_WORKERS + "\n\n"
+                + "# Smooth Gameplay Mode: paces background chunk loading so FPS and TPS stay smooth\n"
+                + "# while flying or exploring. Automatically bypassed during Chunky pregeneration.\n"
+                + "adaptive_governor=" + ADAPTIVE_GOVERNOR + "\n\n"
+                + "# Fast Chunk Saving: writes chunk data asynchronously in the background for faster\n"
+                + "# saving. Turn off only if you want strict per-write disk flushes.\n"
+                + "fast_async_saving=" + FAST_ASYNC_SAVING + "\n\n"
+                + "# --- Visuals & HUD ---\n\n"
+                + "# Maximum Render Distance allowed on the Video Settings slider (32 to 64 chunks).\n"
+                + "# Note: If Sodium is installed, restart the game after changing this.\n"
+                + "full_chunk_radius=" + FULL_CHUNK_RADIUS + "\n\n"
+                + "# Better Nether & End Fog: extends Nether and End fog to match your Render Distance.\n"
+                + "# Automatically yields if Voxy or Distant Horizons is installed.\n"
+                + "scale_dimension_fog=" + SCALE_DIMENSION_FOG + "\n\n"
+                + "# Show Performance HUD on Launch: displays live FPS, MSPT, and chunk speed on startup.\n"
+                + "# Press F7 in-game anytime to temporarily show or hide the HUD.\n"
+                + "live_benchmark_hud=" + LIVE_BENCHMARK_HUD + "\n";
 
         try {
             Path parent = CONFIG_PATH.getParent();
@@ -153,7 +179,7 @@ public final class ModConfig {
                 Files.createDirectories(parent);
             }
             try (OutputStream out = Files.newOutputStream(CONFIG_PATH)) {
-                props.store(out, "Chunking Engine Configuration");
+                out.write(text.getBytes(StandardCharsets.UTF_8));
             }
         } catch (IOException e) {
             System.err.println("[Chunking] Could not write " + CONFIG_PATH.toAbsolutePath() + ": " + e);
@@ -173,15 +199,19 @@ public final class ModConfig {
     private static boolean bool(String sysKey, String fileKey, boolean fallback) {
         String val = System.getProperty(sysKey);
         if (val == null) val = FILE.getProperty(fileKey);
-        return val == null ? fallback : Boolean.parseBoolean(val);
+        return val == null ? fallback : Boolean.parseBoolean(val.trim());
     }
 
     private static int integer(String sysKey, String fileKey, int fallback, int min, int max) {
         String val = System.getProperty(sysKey);
         if (val == null) val = FILE.getProperty(fileKey);
         if (val == null) return fallback;
+        String trimmed = val.trim();
+        if ("auto".equalsIgnoreCase(trimmed)) {
+            return 0;
+        }
         try {
-            int parsed = Integer.parseInt(val);
+            int parsed = Integer.parseInt(trimmed);
             return Math.max(min, Math.min(max, parsed));
         } catch (NumberFormatException ignored) {
             return fallback;

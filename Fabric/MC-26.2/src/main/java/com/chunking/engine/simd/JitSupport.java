@@ -299,7 +299,14 @@ public final class JitSupport {
     }
 
     public static double evalFallback(DensityFunction fn, int bx, int by, int bz) {
-        return fn.compute(CTX_TL.get().set(bx, by, bz));
+        MutableContext ctx = CTX_TL.get();
+        int px = ctx.x, py = ctx.y, pz = ctx.z;
+        ctx.set(bx, by, bz);
+        try {
+            return fn.compute(ctx);
+        } finally {
+            ctx.set(px, py, pz);
+        }
     }
 
     public static double sampleFlatCache(Object accessObj, int bx, int bz) {
@@ -348,21 +355,42 @@ public final class JitSupport {
         if (blender == null || blender.isEmpty()) {
             return val;
         }
-        return blender.blendDensity(CTX_TL.get().set(bx, by, bz), val);
+        MutableContext ctx = CTX_TL.get();
+        int px = ctx.x, py = ctx.y, pz = ctx.z;
+        ctx.set(bx, by, bz);
+        try {
+            return blender.blendDensity(ctx, val);
+        } finally {
+            ctx.set(px, py, pz);
+        }
     }
 
     public static double blendAlpha(NoiseChunk noiseChunk, int bx, int by, int bz, DensityFunction fn) {
         if (noiseChunk == null || isBlenderEmpty(noiseChunk)) {
             return 1.0D;
         }
-        return fn.compute(CTX_TL.get().set(bx, by, bz));
+        MutableContext ctx = CTX_TL.get();
+        int px = ctx.x, py = ctx.y, pz = ctx.z;
+        ctx.set(bx, by, bz);
+        try {
+            return fn.compute(ctx);
+        } finally {
+            ctx.set(px, py, pz);
+        }
     }
 
     public static double blendOffset(NoiseChunk noiseChunk, int bx, int by, int bz, DensityFunction fn) {
         if (noiseChunk == null || isBlenderEmpty(noiseChunk)) {
             return 0.0D;
         }
-        return fn.compute(CTX_TL.get().set(bx, by, bz));
+        MutableContext ctx = CTX_TL.get();
+        int px = ctx.x, py = ctx.y, pz = ctx.z;
+        ctx.set(bx, by, bz);
+        try {
+            return fn.compute(ctx);
+        } finally {
+            ctx.set(px, py, pz);
+        }
     }
 
     public static boolean canUseCellCorners(NoiseChunk noiseChunk) {
@@ -528,7 +556,7 @@ public final class JitSupport {
         return d == 0.0F ? val : val + d * (c - locs[idx]);
     }
 
-    private record LastOreMask(RandomState state, boolean[] mask) {}
+    private record LastOreMask(java.lang.ref.WeakReference<RandomState> stateRef, boolean[] mask) {}
 
     private static final Map<RandomState, boolean[]> ORE_INTERPOLATOR_MASK_CACHE =
             new WeakHashMap<>();
@@ -549,7 +577,7 @@ public final class JitSupport {
         }
         int size = interpolators.size();
         LastOreMask last = LAST_ORE_MASK;
-        boolean[] mask = (last != null && last.state == randomState) ? last.mask : null;
+        boolean[] mask = (last != null && last.stateRef.get() == randomState) ? last.mask : null;
         if (mask == null || mask.length != size) {
             synchronized (ORE_INTERPOLATOR_MASK_CACHE) {
                 mask = ORE_INTERPOLATOR_MASK_CACHE.get(randomState);
@@ -557,7 +585,7 @@ public final class JitSupport {
                     mask = computeOreInterpolatorMask(interpolators, aquifer, preliminarySurfaceLevel, fullNoiseDensity);
                     ORE_INTERPOLATOR_MASK_CACHE.put(randomState, mask);
                 }
-                LAST_ORE_MASK = new LastOreMask(randomState, mask);
+                LAST_ORE_MASK = new LastOreMask(new java.lang.ref.WeakReference<>(randomState), mask);
             }
         }
         for (int i = 0; i < size; i++) {

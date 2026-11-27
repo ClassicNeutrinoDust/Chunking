@@ -32,7 +32,6 @@ public final class ClientRuntime {
 
     private static long streamingBudgetTotalNs = 0L;
     private static long streamingBudgetSpentNs = 0L;
-    private static int consecutiveDeferredLightFrames = 0;
 
     // Fast single-frame spike detector (written by render thread, read cross-thread by integrated server)
     private static long lastRenderFrameNs = 0L;
@@ -176,7 +175,6 @@ public final class ClientRuntime {
     }
 
     public static void recordLightRan() {
-        consecutiveDeferredLightFrames = 0;
     }
 
     public boolean isMovingFast() {
@@ -253,11 +251,11 @@ public final class ClientRuntime {
         this.smoothedTurnDegPerSec = 0.0D;
         streamingBudgetTotalNs = INITIAL_WORLD_LOAD_BUDGET_NS;
         streamingBudgetSpentNs = 0L;
-        consecutiveDeferredLightFrames = 0;
         lastRenderFrameNs = 0L;
         localFrameEwmaNs = 16_666_667L;
         localSpikeCooldownFrames = 0;
         guiTransitionUntilNs = 0L;
+        DebugHud.resetDisplay();
     }
 
     /**

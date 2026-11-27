@@ -74,6 +74,7 @@ public final class LoadPacer {
     private static final ConcurrentHashMap<Executor, PacerQueue> QUEUES = new ConcurrentHashMap<>(4);
     private static final AtomicInteger GLOBAL_PENDING = new AtomicInteger();
     private static final AtomicBoolean HOOKS_REGISTERED = new AtomicBoolean();
+    private static volatile boolean stopping;
 
     private LoadPacer() {}
 
@@ -164,6 +165,9 @@ public final class LoadPacer {
             Supplier<T> work,
             Executor mainThreadExecutor
     ) {
+        if (stopping) {
+            return CompletableFuture.supplyAsync(work, mainThreadExecutor);
+        }
         CompletableFuture<T> future = new CompletableFuture<>();
         PacerQueue queue = QUEUES.computeIfAbsent(mainThreadExecutor, k -> new PacerQueue());
         if (level != null) {
@@ -245,21 +249,32 @@ public final class LoadPacer {
     }
 
     public static void flushAll() {
-        for (PacerQueue queue : QUEUES.values()) {
-            pullIngress(queue);
-            while (!queue.ready.isEmpty()) {
-                PendingPromotion<?> item = queue.ready.remove(queue.ready.size() - 1);
-                decrementPending();
-                item.run();
+        stopping = true;
+        boolean drained;
+        do {
+            drained = false;
+            for (PacerQueue queue : QUEUES.values()) {
+                pullIngress(queue);
+                while (!queue.ready.isEmpty()) {
+                    PendingPromotion<?> item = queue.ready.remove(queue.ready.size() - 1);
+                    decrementPending();
+                    item.run();
+                    drained = true;
+                }
             }
-        }
+        } while (drained);
+        QUEUES.clear();
+        GLOBAL_PENDING.set(0);
+    }
+
+    public static void resetSession() {
+        stopping = false;
         QUEUES.clear();
         GLOBAL_PENDING.set(0);
     }
 
     public static void resetForTest() {
-        QUEUES.clear();
-        GLOBAL_PENDING.set(0);
+        resetSession();
     }
 
     private static void onServerTickStart(MinecraftServer server) {
@@ -316,6 +331,7 @@ public final class LoadPacer {
                 item.run();
                 queue.spentNsThisTick += Math.max(0L, System.nanoTime() - t0);
                 queue.drainedThisTick++;
+                i = Math.min(i, queue.ready.size());
             }
         }
     }

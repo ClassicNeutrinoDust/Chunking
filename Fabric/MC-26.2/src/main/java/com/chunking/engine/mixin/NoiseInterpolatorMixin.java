@@ -380,19 +380,27 @@ public abstract class NoiseInterpolatorMixin implements NoiseInterpolatorAccess 
         int maxCount = eval.chunking$getOreVeinSliceCount(s0[cellZ].length);
         if (bound != null) {
             if ((m0 & b0) == 0) {
-                eval.chunking$evalVerticalSliceAtCached(s0[cellZ], bound, x0, z0, maxCount, ord);
+                if (!eval.chunking$evalVerticalSliceAtCached(s0[cellZ], bound, x0, z0, maxCount, ord)) {
+                    chunking$fillCornerScalar(nc, s0[cellZ], x0, z0, maxCount);
+                }
                 m0 |= b0;
             }
             if ((m0 & b1) == 0) {
-                eval.chunking$evalVerticalSliceAtCached(s0[cellZ + 1], bound, x0, z1, maxCount, ord);
+                if (!eval.chunking$evalVerticalSliceAtCached(s0[cellZ + 1], bound, x0, z1, maxCount, ord)) {
+                    chunking$fillCornerScalar(nc, s0[cellZ + 1], x0, z1, maxCount);
+                }
                 m0 |= b1;
             }
             if ((m1 & b0) == 0) {
-                eval.chunking$evalVerticalSliceAtCached(s1[cellZ], bound, x1, z0, maxCount, ord);
+                if (!eval.chunking$evalVerticalSliceAtCached(s1[cellZ], bound, x1, z0, maxCount, ord)) {
+                    chunking$fillCornerScalar(nc, s1[cellZ], x1, z0, maxCount);
+                }
                 m1 |= b0;
             }
             if ((m1 & b1) == 0) {
-                eval.chunking$evalVerticalSliceAtCached(s1[cellZ + 1], bound, x1, z1, maxCount, ord);
+                if (!eval.chunking$evalVerticalSliceAtCached(s1[cellZ + 1], bound, x1, z1, maxCount, ord)) {
+                    chunking$fillCornerScalar(nc, s1[cellZ + 1], x1, z1, maxCount);
+                }
                 m1 |= b1;
             }
         } else {
@@ -425,6 +433,22 @@ public abstract class NoiseInterpolatorMixin implements NoiseInterpolatorAccess 
         this.chunking$filledMask1 = m1;
     }
 
+    @org.spongepowered.asm.mixin.Unique
+    private void chunking$fillCornerScalar(NoiseChunk nc, double[] dst, int x, int z, int maxCount) {
+        NoiseChunkAccessor acc = (NoiseChunkAccessor) nc;
+        int minYCell = acc.chunking$getCellNoiseMinY();
+        int ch = acc.chunking$getCellHeight();
+        JitSupport.MutableContext ctx = JitSupport.borrowContext(0, 0, 0);
+        int px = ctx.x, py = ctx.y, pz = ctx.z;
+        try {
+            for (int i = 0; i < maxCount; i++) {
+                dst[i] = this.noiseFiller.compute(ctx.set(x, (i + minYCell) * ch, z));
+            }
+        } finally {
+            ctx.set(px, py, pz);
+        }
+    }
+
     @Override
     public void chunking$updateForY(double ty) {
         this.updateForY(ty);
@@ -446,6 +470,14 @@ public abstract class NoiseInterpolatorMixin implements NoiseInterpolatorAccess 
             net.minecraft.world.level.levelgen.DensityFunction.ContextProvider contextProvider,
             org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci
     ) {
+        if (this.slice0 == null || this.slice0 == CHUNKING$DUMMY_SLICE
+                || this.slice1 == null || this.slice1 == CHUNKING$DUMMY_SLICE) {
+            chunking$ensureSlices(this.chunking$savedCellCountY, this.chunking$savedCellCountXZ);
+        }
+        if (array.length > 0 && array == CHUNKING$DUMMY_SLICE[0]) {
+            ci.cancel();
+            return;
+        }
         if (!com.chunking.engine.config.ModConfig.SIMD_NOISE
                 || !(contextProvider instanceof com.chunking.engine.access.SliceProviderAccess sliceAcc)) {
             return;
@@ -459,14 +491,6 @@ public abstract class NoiseInterpolatorMixin implements NoiseInterpolatorAccess 
             ci.cancel();
             return;
         }
-        if (this.slice0 == null || this.slice0 == CHUNKING$DUMMY_SLICE
-                || this.slice1 == null || this.slice1 == CHUNKING$DUMMY_SLICE) {
-            chunking$ensureSlices(this.chunking$savedCellCountY, this.chunking$savedCellCountXZ);
-            if (array.length > 0 && array == CHUNKING$DUMMY_SLICE[0]) {
-                ci.cancel();
-                return;
-            }
-        }
         com.chunking.engine.access.NoiseSliceEval eval =
                 (com.chunking.engine.access.NoiseSliceEval) nc;
         com.chunking.engine.simd.NoiseJit.BoundKernel bound = this.chunking$sliceKernel;
@@ -478,7 +502,7 @@ public abstract class NoiseInterpolatorMixin implements NoiseInterpolatorAccess 
         if (bound == null) {
             return;
         }
-        if (this.chunking$oreVeinOnly) {
+        if (this.chunking$oreVeinOnly && !net.minecraft.SharedConstants.DEBUG_ORE_VEINS) {
             eval.chunking$setMaxSliceCount(eval.chunking$getOreVeinSliceCount(array.length));
         }
         int ord = chunking$getOrResolveOrdinal(eval);

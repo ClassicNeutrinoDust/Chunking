@@ -420,23 +420,36 @@ public final class FrameGuard {
         this.allocEwmaMbPerSec = prev + alpha * (clamped - prev);
     }
 
-    public synchronized void start(int maxWorkers, Consumer<String> logSink) {
-        if (running) {
-            return;
+    public void start(int maxWorkers, Consumer<String> logSink) {
+        synchronized (this.controlLock) {
+            if (running) {
+                this.maxWorkers = Math.max(1, maxWorkers);
+                this.minWorkers = this.maxWorkers;
+                this.targetWorkers = this.maxWorkers;
+                return;
+            }
+            init(maxWorkers, logSink);
+            // Never throttle worldgen worker count below configured workers
+            this.minWorkers = this.maxWorkers;
+            this.minSendRateFloor = LIVE_MIN_SEND_RATE;
+            this.testCapOverride = false;
+            this.executor = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "Chunking-Governor");
+                t.setDaemon(true);
+                t.setPriority(Math.max(Thread.MIN_PRIORITY, Thread.NORM_PRIORITY - 1));
+                return t;
+            });
+            this.running = true;
+            this.executor.scheduleWithFixedDelay(this::safeStep, INTERVAL_MS, INTERVAL_MS, TimeUnit.MILLISECONDS);
         }
-        init(maxWorkers, logSink);
-        // Never throttle worldgen worker count below configured workers (v14 behavior)
-        this.minWorkers = this.maxWorkers;
-        this.minSendRateFloor = LIVE_MIN_SEND_RATE;
-        this.testCapOverride = false;
-        this.executor = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "Chunking-Governor");
-            t.setDaemon(true);
-            t.setPriority(Math.max(Thread.MIN_PRIORITY, Thread.NORM_PRIORITY - 1));
-            return t;
-        });
-        this.running = true;
-        this.executor.scheduleWithFixedDelay(this::safeStep, INTERVAL_MS, INTERVAL_MS, TimeUnit.MILLISECONDS);
+    }
+
+    public void updateMaxWorkers(int newMaxWorkers) {
+        synchronized (this.controlLock) {
+            this.maxWorkers = Math.max(1, newMaxWorkers);
+            this.minWorkers = this.maxWorkers;
+            this.targetWorkers = this.maxWorkers;
+        }
     }
 
     void init(int maxWorkers, Consumer<String> logSink) {

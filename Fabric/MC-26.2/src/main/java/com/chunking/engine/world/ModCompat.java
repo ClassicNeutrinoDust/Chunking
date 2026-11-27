@@ -94,8 +94,7 @@ public final class ModCompat {
             String name = type.getName();
             return "dev.worldgen.tectonic.worldgen.densityfunction.ConfigConstant".equals(name)
                     || "dev.worldgen.tectonic.worldgen.densityfunction.Invert".equals(name)
-                    || "dev.worldgen.tectonic.worldgen.densityfunction.ConfigClamp".equals(name)
-                    || "dev.worldgen.tectonic.worldgen.densityfunction.ConfigNoise".equals(name);
+                    || "dev.worldgen.tectonic.worldgen.densityfunction.ConfigClamp".equals(name);
         }
     };
 

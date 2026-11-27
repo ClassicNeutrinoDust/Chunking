@@ -424,6 +424,9 @@ public final class CellSkipper {
             evalRange(this.yInvEnd, n, baseX, startY, endY, baseZ, -1.0D);
         }
         int r = this.rootIdx;
+        if (Double.isNaN(this.lo[r]) || Double.isNaN(this.hi[r])) {
+            return 0;
+        }
         if (this.hi[r] <= 0.0D) {
             return -1;
         }
@@ -454,6 +457,9 @@ public final class CellSkipper {
             evalRange(this.yInvEnd, n, baseX, startY, endY, baseZ, tMax);
         }
         int r = this.rootIdx;
+        if (Double.isNaN(this.lo[r]) || Double.isNaN(this.hi[r])) {
+            return 0;
+        }
         if (this.hi[r] <= 0.0D) {
             return -1;
         }
@@ -640,7 +646,10 @@ public final class CellSkipper {
                     int idx = lefts[i];
                     double a = los[idx];
                     double b = his[idx];
-                    if (a >= 0.0D) {
+                    if (Double.isNaN(a) || Double.isNaN(b)) {
+                        los[i] = Double.NaN;
+                        his[i] = Double.NaN;
+                    } else if (a >= 0.0D) {
                         los[i] = a;
                         his[i] = b;
                     } else if (b <= 0.0D) {

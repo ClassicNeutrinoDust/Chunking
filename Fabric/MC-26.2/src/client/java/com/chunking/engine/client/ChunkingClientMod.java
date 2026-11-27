@@ -27,12 +27,18 @@ public final class ChunkingClientMod implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        if (Boolean.getBoolean("chunking.passive")) {
+            return;
+        }
         KeyMapping toggleHudKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.chunking.toggle_hud", InputConstants.Type.KEYSYM, InputConstants.KEY_F7, KEY_CATEGORY));
         KeyMapping openSettingsKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.chunking.open_settings", InputConstants.Type.KEYSYM, InputConstants.KEY_F8, KEY_CATEGORY));
         KeyMapping resetHudKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.chunking.reset_hud", InputConstants.Type.KEYSYM, InputConstants.KEY_F9, KEY_CATEGORY));
+
+        DebugHud.setVisible(ModConfig.LIVE_BENCHMARK_HUD);
+        DebugHud.setKeyMappings(toggleHudKey, resetHudKey);
 
         HudElementRegistry.attachElementBefore(
                 VanillaHudElements.CHAT,
@@ -55,8 +61,9 @@ public final class ChunkingClientMod implements ClientModInitializer {
                 return;
             }
             while (toggleHudKey.consumeClick()) {
-                ModConfig.LIVE_BENCHMARK_HUD = !ModConfig.LIVE_BENCHMARK_HUD;
-                ModConfig.save();
+                if (mc.level != null && mc.gui.screen() == null) {
+                    DebugHud.toggleVisible();
+                }
             }
             while (openSettingsKey.consumeClick()) {
                 if (mc.gui.screen() == null) {
