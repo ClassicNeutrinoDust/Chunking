@@ -1,0 +1,121 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version '1.17.17'
+}
+
+version = project.mod_version
+group = project.maven_group
+base { archivesName = project.archives_base_name }
+
+repositories {
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = "Modrinth"
+                url = "https://api.modrinth.com/maven"
+            }
+        }
+        filter {
+            includeGroup "maven.modrinth"
+        }
+    }
+    maven {
+        name = "Terraformers"
+        url = "https://maven.terraformersmc.com/"
+    }
+}
+
+loom {
+    splitEnvironmentSourceSets()
+    mods {
+        "chunking" {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+    }
+    runs {
+        client {
+            vmArg "--enable-native-access=ALL-UNNAMED"
+            vmArg "-Xms4G"
+            vmArg "-Xmx4G"
+            vmArg "-XX:+UseZGC"
+            System.getProperties().stringPropertyNames().each { String prop ->
+                if (prop.startsWith("chunking.")) {
+                    vmArg "-D${prop}=" + System.getProperty(prop)
+                }
+            }
+        }
+        server {
+            vmArg "--enable-native-access=ALL-UNNAMED"
+            vmArg "-Xms4G"
+            vmArg "-Xmx4G"
+            System.getProperties().stringPropertyNames().each { String prop ->
+                if (prop.startsWith("chunking.")) {
+                    vmArg "-D${prop}=" + System.getProperty(prop)
+                }
+            }
+        }
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    implementation "maven.modrinth:cloth-config:26.2.155+fabric"
+    include "maven.modrinth:cloth-config:26.2.155+fabric"
+    clientCompileOnly("com.terraformersmc:modmenu:21.0.1") {
+        transitive = false
+    }
+}
+
+processResources {
+    inputs.property "version", project.version
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version
+    }
+    def sharedNatives = file("../../natives")
+    if (sharedNatives.exists()) {
+        from(sharedNatives) {
+            into "natives"
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 25
+}
+
+java {
+    withSourcesJar()
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+}
+
+tasks.register('chunkingRegressionTest', JavaExec) {
+    dependsOn tasks.testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.chunking.engine.EngineTests'
+    jvmArgs '-ea', '--enable-native-access=ALL-UNNAMED', '-Xms4G', '-Xmx4G'
+}
+
+tasks.register('chunkyBenchmark', JavaExec) {
+    dependsOn tasks.testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.chunking.engine.benchmark.ChunkyBench'
+    jvmArgs '-ea', '--enable-native-access=ALL-UNNAMED', '-Xms4G', '-Xmx4G'
+    for (String prop : ['chunking.bench_workers', 'chunking.bench_radius', 'chunking.bench_warmup_radius', 'chunking.bench_seed']) {
+        String val = System.getProperty(prop)
+        if (val != null) {
+            systemProperty prop, val
+        }
+    }
+}
+
+tasks.named('test') {
+    enabled = false
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('chunkingRegressionTest')
+}

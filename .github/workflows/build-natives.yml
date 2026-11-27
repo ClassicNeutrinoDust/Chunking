@@ -110,3 +110,41 @@ jobs:
           name: native-${{ matrix.name }}
           path: ${{ steps.root.outputs.dir }}/${{ matrix.output }}
           if-no-files-found: error
+
+  commit-natives:
+    needs: build-natives
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download built native artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: downloaded-natives
+
+      - name: Copy natives into repo-root natives/ and commit
+        shell: bash
+        run: |
+          mkdir -p natives/windows-x64 natives/linux-x64 natives/linux-aarch64 natives/macos-aarch64
+
+          cp -f downloaded-natives/native-windows-x64/chunking_avx2.dll natives/windows-x64/
+          cp -f downloaded-natives/native-linux-x64/libchunking_avx2.so natives/linux-x64/
+          cp -f downloaded-natives/native-linux-aarch64/libchunking_neon.so natives/linux-aarch64/
+          cp -f downloaded-natives/native-macos-aarch64/libchunking_neon.dylib natives/macos-aarch64/
+          rm -rf downloaded-natives
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add natives
+          if git diff --cached --quiet; then
+            echo "Native binaries are already up to date."
+          else
+            git commit -m "Update native SIMD libraries [skip ci]"
+            git push
+          fi
