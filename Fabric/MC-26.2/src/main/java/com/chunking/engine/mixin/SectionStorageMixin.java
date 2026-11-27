@@ -156,6 +156,11 @@ public abstract class SectionStorageMixin implements SectionStorageEvictAccess {
             ring = new long[CHUNKING$POI_RING_CAP];
             this.chunking$poiEvictRing = ring;
         }
+        if (this.chunking$reloadedSinceEvict != null) {
+            synchronized (this.loadLock) {
+                this.chunking$reloadedSinceEvict.remove(packedChunkPos);
+            }
+        }
         int idx = this.chunking$poiEvictHead;
         boolean wasFull = this.chunking$poiEvictFull;
         long expired = ring[idx];
@@ -261,7 +266,7 @@ public abstract class SectionStorageMixin implements SectionStorageEvictAccess {
         long chunkKey = ChunkPos.pack(SectionPos.x(sectionPos), SectionPos.z(sectionPos));
         boolean loaded;
         synchronized (this.loadLock) {
-            loaded = this.loadedChunks.contains(chunkKey);
+            loaded = this.loadedChunks.contains(chunkKey) && !this.pendingLoads.containsKey(chunkKey);
         }
         if (loaded) {
             cir.setReturnValue(Optional.empty());
