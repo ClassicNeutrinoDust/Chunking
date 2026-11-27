@@ -367,11 +367,7 @@ public final class AreaLock {
     }
 
     private boolean parkOnBlocker(AreaRequest<?> req, Long blockerKey) {
-        req.scratchFlag = false;
-        this.cellLocks.compute(blockerKey, (k, slot) -> {
-            if (slot == null) {
-                return null;
-            }
+        return this.cellLocks.computeIfPresent(blockerKey, (k, slot) -> {
             if (slot.waiters == null) {
                 slot.waiters = new ArrayDeque<>(4);
             }
@@ -380,10 +376,8 @@ public final class AreaLock {
                 this.deferredAdmits.incrementAndGet();
             }
             slot.waiters.addLast(req);
-            req.scratchFlag = true;
             return slot;
-        });
-        return req.scratchFlag;
+        }) != null;
     }
 
     private void releaseCells(AreaRequest<?> req, int count) {
