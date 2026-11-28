@@ -17,7 +17,9 @@ Config: Set ```worldgen_workers``` = {Threads being used} in chunking.properties
 
 JVM Flags: ```-Xms4G -Xmx4G -Datlas.entity.hotpath=true -Datlas.entity.ai.index=true -Datlas.entity.ai.sensor.cache=false -Datlas.entity.ai.poi.index=false -Datlas.entity.ai.navigation.cache=false -Datlas.entity.ai.collision.query=false -Datlas.entity.profile=true -Datlas.entity.query.profile=true```
 
-Mesurement: In overworld, ```Radius = 3072``` , Shape circle, ```center = 100000, 100000``` , 148225 chunks in total.
+**Seed:** `114862964781274189`
+
+Mesurement: In overworld | ```Radius = 3072``` | Shape circle | ```center = 100000, 100000``` | 148225 chunks in total.
 
 ### Chunking Benchmark (CPU Turbo Boost Off)(Threads 1-16)
 
