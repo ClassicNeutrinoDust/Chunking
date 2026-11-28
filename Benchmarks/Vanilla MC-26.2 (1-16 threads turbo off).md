@@ -1,6 +1,12 @@
 # Benchmark setup
 All the benchmark done on laptop CPU ```Intel® Core™ i7 processor 14700HX 14th gen``` with Turbo off @ ```2.1ghz``` base speed with ```Long power PL1 = 115W and short power PL2 = 90W``` and on ```windows 11 26H2 OS build 26300.9974``` . 
 
+```
+java version "25.0.4" 2026-07-21 LTS
+Java(TM) SE Runtime Environment (build 25.0.4+7-LTS-189)
+Java HotSpot(TM) 64-Bit Server VM (build 25.0.4+7-LTS-189, mixed mode, sharing)
+```
+
 # Chunking Benchmark
 Fabric mods used are:
 
