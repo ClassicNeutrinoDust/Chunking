@@ -12,14 +12,38 @@ fabric-api-0.161.0+26.2.jar
 ScalableLux-fabric-0.3.0-alpha.0.3-all.jar
 spark-1.10.187-fabric.jar
 ```
+# C2ME Benchmark
+Fabric mods used are:
 
-Config: Set ```worldgen_workers``` = {Threads being used} in chunking.properties.
+```
+c2me-fabric-mc26.2-0.4.2-alpha.0.67.jar
+Chunky-Fabric-1.5.66.jar
+cloth-config-26.2.155.jar
+fabric-api-0.161.0+26.2.jar
+ScalableLux-fabric-0.3.0-alpha.0.3-all.jar
+spark-1.10.187-fabric.jar
+```
 
-JVM Flags: ```-Xms4G -Xmx4G -Datlas.entity.hotpath=true -Datlas.entity.ai.index=true -Datlas.entity.ai.sensor.cache=false -Datlas.entity.ai.poi.index=false -Datlas.entity.ai.navigation.cache=false -Datlas.entity.ai.collision.query=false -Datlas.entity.profile=true -Datlas.entity.query.profile=true```
+# Vanilla Benchmark
+Fabric mods used are:
+
+```
+Chunky-Fabric-1.5.66.jar
+cloth-config-26.2.155.jar
+fabric-api-0.161.0+26.2.jar
+ScalableLux-fabric-0.3.0-alpha.0.3-all.jar
+spark-1.10.187-fabric.jar
+```
+Chunking Config: Set ```worldgen_workers = {Threads being used}``` in chunking.properties.
+C2ME config: ```threadPoolPriorityPreset = "UNSET"``` and ```globalExecutorParallelism = {Threads being used}``` and rest default config.
+
+Vanilla JVM flags: ```-Xms4G -Xmx4G -Datlas.entity.hotpath=true -Datlas.entity.ai.index=true -Datlas.entity.ai.sensor.cache=false -Datlas.entity.ai.poi.index=false -Datlas.entity.ai.navigation.cache=false -Datlas.entity.ai.collision.query=false -Datlas.entity.profile=true -Datlas.entity.query.profile=true -Dmax.bg.threads=<N>```
+
+JVM Flags(C2ME and Chunking): ```-Xms4G -Xmx4G -Datlas.entity.hotpath=true -Datlas.entity.ai.index=true -Datlas.entity.ai.sensor.cache=false -Datlas.entity.ai.poi.index=false -Datlas.entity.ai.navigation.cache=false -Datlas.entity.ai.collision.query=false -Datlas.entity.profile=true -Datlas.entity.query.profile=true```
 
 **Seed:** `114862964781274189`
 
-Mesurement: In overworld | ```Radius = 3072``` | Shape circle | ```center = 100000, 100000``` | 148225 chunks in total.
+**Mesurement**: In overworld | ```Radius = 3072``` | Shape circle | ```center = 100000, 100000``` | 148225 chunks in total.
 
 ### Chunking Benchmark (CPU Turbo Boost Off)(Threads 1-16)
 
